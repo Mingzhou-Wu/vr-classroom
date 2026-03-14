@@ -333,9 +333,9 @@ async function togglePostLike(post: IForumPost) {
 
 <template>
   <view class="min-h-screen bg-[#f3f6f9]">
-    <view id="forum-header" class="fixed left-0 right-0 z-100 flex flex-col gap-10rpx bg-[linear-gradient(180deg,#eaf2f8_0%,#f3f6f9_100%)] px-16rpx pt-16rpx pb-12rpx">
+    <view id="forum-header" class="fixed left-0 right-0 z-100 flex flex-col gap-10rpx bg-[linear-gradient(180deg,#eaf2f8_0%,#f3f6f9_100%)] px-16rpx pb-12rpx pt-16rpx">
       <view class="flex items-center justify-center gap-8rpx">
-        <view class="i-mdi-forum-outline h-28rpx w-28rpx color-[#215476]" />
+        <view class="i-material-symbols-forum-rounded h-28rpx w-28rpx color-[#215476]" />
         <wd-text text="连接母校与校友的交流社区" size="22rpx" color="#215476" />
       </view>
       <view class="rd-14rpx bg-white px-8rpx py-6rpx" style="box-shadow: 0 4rpx 12rpx rgba(33,84,118,0.08)">
@@ -349,7 +349,7 @@ async function togglePostLike(post: IForumPost) {
       :style="{ top: `${headerHeight}px`, backdropFilter: 'blur(6rpx)', WebkitBackdropFilter: 'blur(6rpx)' }"
     >
       <scroll-view scroll-x :show-scrollbar="false" class="w-full whitespace-nowrap">
-        <view v-if="loading" class="box-border inline-flex min-w-full gap-8rpx px-8rpx">
+        <view v-if="loading" class="box-border min-w-full inline-flex gap-8rpx px-8rpx">
           <view
             v-for="item in skeletonTabs"
             :key="`skeleton-tab-${item}`"
@@ -358,7 +358,7 @@ async function togglePostLike(post: IForumPost) {
           />
         </view>
 
-        <view v-else class="box-border inline-flex min-w-full gap-8rpx px-8rpx">
+        <view v-else class="box-border min-w-full inline-flex gap-8rpx px-8rpx">
           <view
             v-for="(item, index) in tabs"
             :key="item.id"
@@ -448,7 +448,7 @@ async function togglePostLike(post: IForumPost) {
 
           <view v-if="getPostImages(post).length === 1" class="flex items-start justify-start">
             <view class="h-420rpx overflow-hidden rd-14rpx bg-white" @tap.stop="handlePreviewPostImages(post, getPostImages(post)[0])">
-              <image :src="getPostImages(post)[0]" mode="heightFix" class="block h-full w-auto max-w-full" />
+              <image :src="getPostImages(post)[0]" mode="heightFix" class="block h-full max-w-full w-auto" />
             </view>
           </view>
 

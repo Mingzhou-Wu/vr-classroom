@@ -80,11 +80,11 @@ function goUserOrderPage() {
 }
 
 const menuList = [
-  { key: 'order', text: '我的捐赠记录', icon: 'i-mdi-receipt-text-outline' },
-  { key: 'post', text: '我的帖子', icon: 'i-mdi-post-outline' },
-  { key: 'comment', text: '我的评论', icon: 'i-mdi-comment-processing-outline' },
-  { key: 'likedPost', text: '我点赞的帖子', icon: 'i-mdi-thumb-up-outline' },
-  { key: 'likedComment', text: '我点赞的评论', icon: 'i-mdi-message-reply-text-outline' },
+  { key: 'order', text: '我的捐赠记录', icon: 'i-material-symbols-receipt-long-rounded' },
+  { key: 'post', text: '我的帖子', icon: 'i-material-symbols-article-rounded' },
+  { key: 'comment', text: '我的评论', icon: 'i-material-symbols-comment-rounded' },
+  { key: 'likedPost', text: '我点赞的帖子', icon: 'i-material-symbols-thumb-up-rounded' },
+  { key: 'likedComment', text: '我点赞的评论', icon: 'i-material-symbols-forum-rounded' },
 ]
 
 function handleMenuTap(key: string) {
@@ -195,7 +195,7 @@ function handleMenuTap(key: string) {
             <view :class="item.icon" class="size-34rpx color-[#215476]" />
             <wd-text :text="item.text" size="28rpx" color="#1f2937" />
           </view>
-          <view class="i-mdi-chevron-right size-34rpx color-[#94a3b8]" />
+          <view class="i-material-symbols-chevron-right-rounded size-34rpx color-[#94a3b8]" />
         </view>
       </view>
     </view>

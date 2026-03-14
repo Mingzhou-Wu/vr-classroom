@@ -168,7 +168,7 @@ function goForumPage() {
             </view>
 
             <view class="flex flex-[3] flex-col gap-16rpx">
-              <wd-text text="VR座椅冠名" size="24rpx" color="#215476" class="[text-shadow:0_2rpx_8rpx_rgba(33,84,118,0.16)]" />
+              <wd-text text="VR教室" size="24rpx" color="#215476" class="[text-shadow:0_2rpx_8rpx_rgba(33,84,118,0.16)]" />
               <wd-img src="http://10.86.136.242:9000/images/index_vr.png" width="100%" height="100%" style="box-shadow: 0 8rpx 18rpx rgba(33,84,118,0.22)" mode="aspectFill" radius="14rpx" @click="goVRPage()" />
             </view>
           </view>

@@ -60,10 +60,21 @@ const selectedTotalPriceText = computed(() => {
   return `¥${(selectedTotalPriceFen.value / 100).toFixed(2)}`
 })
 
-const donateButtonText = computed(() => {
-  if (!selectedSeatIds.value.length)
-    return '去捐赠'
-  return `去捐赠 ${selectedTotalPriceText.value}`
+const seatLegendList = [
+  { key: 'available', text: '空 · 可选', className: 'b-[#bfd6e6] bg-white text-[#2f5f80]' },
+  { key: 'selected', text: '选 · 已选', className: 'b-[#215476] bg-[#215476] text-white' },
+  { key: 'locked', text: '锁 · 已锁', className: 'b-[#f5c58a] bg-[#fbe4c5] text-[#8a5b2c]' },
+  { key: 'sold', text: '售 · 已售', className: 'b-[#d2d9e0] bg-[#dfe6ed] text-[#6b7280]' },
+  { key: 'aisle', text: '过 · 过道', className: 'b-[#d7e2ea] b-dashed bg-transparent text-[#9ca3af]' },
+]
+
+const selectedSeatSummaryText = computed(() => {
+  if (!selectedSeats.value.length)
+    return '请选择要捐赠的座位'
+
+  return selectedSeats.value
+    .map(seat => `${seat.row}排${seat.col}座`)
+    .join('、')
 })
 
 function formatPrice(fen: number) {
@@ -91,16 +102,16 @@ function getSeatText(seat: IRoomSeat | null) {
 }
 
 function getSeatClass(seat: IRoomSeat | null) {
-  const baseClass = 'h-56rpx w-56rpx flex items-center justify-center rounded-8rpx text-22rpx border box-border'
+  const baseClass = 'h-56rpx w-56rpx flex items-center justify-center rd-12rpx text-22rpx b-2rpx b-solid box-border transition-all duration-200'
   if (!seat || seat.status === 0)
-    return `${baseClass} border-dashed border-gray-300 text-gray-300`
+    return `${baseClass} b-dashed b-[#d7e2ea] bg-transparent text-[#9ca3af]`
   if (seat.status === 2)
-    return `${baseClass} border-[#FFCC99] bg-[#FFCC99] text-amber-900 opacity-80`
+    return `${baseClass} b-[#f5c58a] bg-[#fbe4c5] text-[#8a5b2c] opacity-90`
   if (seat.status === 3)
-    return `${baseClass} border-gray-300 bg-gray-200 text-gray-500 opacity-70`
+    return `${baseClass} b-[#d2d9e0] bg-[#dfe6ed] text-[#6b7280]`
   if (isSeatSelected(seat))
-    return `${baseClass} border-[#99CCFF] bg-[#99CCFF] text-sky-800`
-  return `${baseClass} border-sky-300 bg-white text-sky-500`
+    return `${baseClass} b-[#215476] bg-[#215476] text-white shadow-[0_6rpx_16rpx_rgba(33,84,118,0.2)]`
+  return `${baseClass} b-[#bfd6e6] bg-white text-[#2f5f80]`
 }
 
 function toggleSeat(seat: IRoomSeat | null) {
@@ -204,84 +215,127 @@ onLoad((query) => {
 </script>
 
 <template>
-  <view class="px-24rpx py-20rpx">
-    <view class="mb-20rpx rounded-8rpx py-12rpx text-center text-24rpx text-gray-700" style="border: 1px solid currentColor;">
-      黑板
-    </view>
+  <view class="min-h-screen bg-[#f3f6f9] px-24rpx pb-220rpx pt-20rpx">
+    <view class="mb-16rpx rd-20rpx bg-white px-20rpx py-16rpx" style="box-shadow: 0 6rpx 14rpx rgba(33,84,118,0.08)">
+      <view class="b-2rpx b-[#d7e2ea] rd-12rpx b-dashed bg-[#f8fbfd] py-10rpx text-center text-24rpx text-[#486074]">
+        黑板
+      </view>
 
-    <view v-if="loading" class="py-40rpx text-center text-26rpx text-gray-500">
-      座位加载中...
-    </view>
-
-    <view v-else-if="!roomSeatsData.totalRows || !roomSeatsData.totalCols" class="py-40rpx text-center text-26rpx text-gray-500">
-      暂无座位数据
-    </view>
-
-    <scroll-view v-else scroll-x :show-scrollbar="false" class="w-full">
-      <view class="min-w-max flex flex-col gap-12rpx">
-        <view v-for="(row, rowIndex) in seatRows" :key="rowIndex" class="w-max flex items-center gap-8rpx">
-          <view class="w-40rpx text-center text-24rpx text-gray-500">
-            {{ rowIndex + 1 }}
-          </view>
-          <view
-            v-for="(seat, colIndex) in row"
-            :key="`${rowIndex + 1}-${colIndex + 1}`"
-            :class="getSeatClass(seat)"
-            @click="toggleSeat(seat)"
-          >
-            {{ getSeatText(seat) }}
+      <view v-if="loading" class="py-24rpx">
+        <view class="flex flex-col gap-12rpx">
+          <view v-for="row in 5" :key="`seat-skeleton-row-${row}`" class="w-max flex items-center gap-8rpx">
+            <view class="h-24rpx w-28rpx rd-full bg-[#dbe8f1]" />
+            <view class="flex items-center gap-8rpx">
+              <view v-for="col in 10" :key="`seat-skeleton-col-${row}-${col}`" class="h-56rpx w-56rpx rd-12rpx bg-[#e7eff5]" />
+            </view>
           </view>
         </view>
       </view>
-    </scroll-view>
 
-    <view class="mt-12rpx center text-right text-20rpx text-gray-400">
-      左右滑动查看更多座位
+      <view v-else-if="!roomSeatsData.totalRows || !roomSeatsData.totalCols" class="py-40rpx text-center text-24rpx text-[#64748b]">
+        暂无座位数据
+      </view>
+
+      <scroll-view v-else scroll-x :show-scrollbar="false" class="w-full">
+        <view class="min-w-max flex flex-col gap-12rpx py-12rpx">
+          <view v-for="(row, rowIndex) in seatRows" :key="rowIndex" class="w-max flex items-center gap-8rpx">
+            <view class="w-40rpx text-center text-22rpx text-[#6b7280]">
+              {{ rowIndex + 1 }}
+            </view>
+            <view
+              v-for="(seat, colIndex) in row"
+              :key="`${rowIndex + 1}-${colIndex + 1}`"
+              :class="getSeatClass(seat)"
+              @click="toggleSeat(seat)"
+            >
+              {{ getSeatText(seat) }}
+            </view>
+          </view>
+        </view>
+      </scroll-view>
+
+      <view class="mt-8rpx text-center text-20rpx text-[#94a3b8]">
+        左右滑动查看更多座位
+      </view>
     </view>
 
-    <view class="mx-24rpx mt-20rpx flex items-center justify-between text-22rpx text-gray-500">
-      <text>空 = 可选</text>
-      <text>选 = 已选</text>
-      <text>锁 = 已锁定</text>
-      <text>售 = 已售</text>
-      <text>过 = 过道</text>
+    <view class="mb-16rpx rd-20rpx bg-white px-20rpx py-16rpx" style="box-shadow: 0 6rpx 14rpx rgba(33,84,118,0.08)">
+      <view class="mb-12rpx flex items-center justify-between">
+        <wd-text text="座位图例" size="26rpx" color="#215476" bold />
+      </view>
+      <view class="grid grid-cols-2 gap-10rpx">
+        <view
+          v-for="item in seatLegendList"
+          :key="item.key"
+          class="flex items-center gap-10rpx rd-12rpx bg-[#f8fafc] px-12rpx py-10rpx"
+        >
+          <view class="h-36rpx w-36rpx flex items-center justify-center b-2rpx rd-8rpx b-solid text-20rpx" :class="item.className">
+            {{ item.text.slice(0, 1) }}
+          </view>
+          <wd-text :text="item.text" size="22rpx" color="#475569" />
+        </view>
+      </view>
     </view>
 
-    <view class="mt-20rpx rounded-12rpx bg-gray-100 p-16rpx">
-      <view class="mb-12rpx flex items-center justify-between text-24rpx text-gray-700">
-        <text>已选座位</text>
-        <view class="flex items-center gap-12rpx">
-          <text>{{ selectedCountText }}</text>
+    <view class="rd-20rpx bg-white px-20rpx py-16rpx" style="box-shadow: 0 6rpx 14rpx rgba(33,84,118,0.08)">
+      <view class="mb-10rpx flex items-center justify-between">
+        <wd-text text="已选座位" size="28rpx" color="#215476" bold />
+        <view class="flex items-center gap-10rpx">
+          <wd-text :text="selectedCountText" size="22rpx" color="#64748b" />
           <view
-            class="h-44rpx w-44rpx flex items-center justify-center rounded-9999rpx bg-gray-200 text-gray-600"
+            class="h-52rpx w-52rpx flex items-center justify-center rd-full bg-[#e7eff5] text-[#486074]"
             @click="clearSelectedSeats"
           >
             <view class="i-material-symbols:delete-forever-outline-rounded h-28rpx w-28rpx" />
           </view>
         </view>
       </view>
-      <view v-if="selectedSeats.length" class="grid grid-cols-3 gap-12rpx">
+
+      <wd-text :text="selectedSeatSummaryText" size="21rpx" color="#64748b" />
+
+      <view v-if="selectedSeats.length" class="grid grid-cols-2 mt-14rpx gap-12rpx">
         <view
           v-for="seat in selectedSeats"
           :key="seat.id"
-          style="height: 96rpx; width: 100%; border: 1px solid #99CCFF; display: flex; align-items: center; justify-content: space-between; gap: 8rpx; border-radius: 10rpx; padding: 0 10rpx; font-size: 24rpx; background-color: #99CCFF; color: #075985; box-sizing: border-box;"
+          class="h-104rpx flex items-center justify-between gap-8rpx b-2rpx b-[#bfd6e6] rd-14rpx b-solid bg-[#eef4f8] px-12rpx"
         >
-          <view style="display: flex; flex-direction: column; justify-content: center; gap: 4rpx;">
-            <text style="display: block; line-height: 30rpx;">{{ `${seat.row}排${seat.col}座` }}</text>
-            <text style="display: block; line-height: 24rpx; font-size: 20rpx;">{{ formatPrice(seat.price) }}</text>
+          <view class="min-w-0 flex flex-1 flex-col justify-center gap-4rpx">
+            <wd-text :text="`${seat.row}排${seat.col}座`" size="24rpx" color="#215476" />
+            <wd-text :text="formatPrice(seat.price)" size="20rpx" color="#4b5563" />
           </view>
-          <view class="h-36rpx w-36rpx flex items-center justify-center" @click="removeSelectedSeat(seat.id)">
-            <view class="i-material-symbols:cancel-outline-rounded h-28rpx w-28rpx" />
+          <view class="h-40rpx w-40rpx flex items-center justify-center color-[#486074]" @click="removeSelectedSeat(seat.id)">
+            <view class="i-material-symbols:cancel-outline-rounded h-30rpx w-30rpx" />
           </view>
         </view>
       </view>
-      <text v-else class="text-24rpx text-gray-500">
-        暂无
-      </text>
+
+      <view v-else class="mt-16rpx h-120rpx center flex rd-14rpx bg-[#f8fafc] text-24rpx text-[#94a3b8]">
+        暂无已选座位
+      </view>
     </view>
 
-    <wd-button class="mt-24rpx !bg-[#215476]" type="primary" block :loading="paying" :disabled="!selectedSeatIds.length || paying" @click="goPay">
-      {{ donateButtonText }}
-    </wd-button>
+    <view
+      class="fixed bottom-0 left-0 right-0 z-120 bg-white px-24rpx pt-14rpx pb-safe"
+      style="box-shadow: 0 -4rpx 12rpx rgba(33,84,118,0.08)"
+    >
+      <view class="pb-14rpx">
+        <view class="mb-10rpx flex items-center justify-between">
+          <wd-text text="捐赠总额" size="22rpx" color="#64748b" />
+          <wd-text :text="selectedTotalPriceText" size="36rpx" color="#215476" bold />
+        </view>
+        <wd-button
+          class="!h-84rpx !rd-full !border-none !bg-[linear-gradient(135deg,#2d6a90_0%,#215476_100%)] !text-28rpx"
+          type="primary"
+          block
+          :loading="paying"
+          :disabled="!selectedSeatIds.length || paying"
+          @click="goPay"
+        >
+          去捐赠
+        </wd-button>
+      </view>
+    </view>
+
+    <view class="h-32rpx" />
   </view>
 </template>
