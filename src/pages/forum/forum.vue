@@ -63,7 +63,6 @@ const tabs = [
   { id: 9, name: '考研留学' },
   { id: 10, name: '行业资讯' },
 ]
-const skeletonTabs = Array.from({ length: 5 }, (_, index) => index)
 const skeletonPostList = Array.from({ length: 3 }, (_, index) => index)
 
 const postList = ref<IForumPost[]>([])
@@ -332,7 +331,7 @@ async function togglePostLike(post: IForumPost) {
 </script>
 
 <template>
-  <view class="min-h-screen bg-[#f3f6f9]">
+  <view class="min-h-screen overflow-x-hidden bg-[#f3f6f9]">
     <view id="forum-header" class="fixed left-0 right-0 z-100 flex flex-col gap-10rpx bg-[linear-gradient(180deg,#eaf2f8_0%,#f3f6f9_100%)] px-16rpx pb-12rpx pt-16rpx">
       <view class="flex items-center justify-center gap-8rpx">
         <view class="i-material-symbols-forum-rounded h-28rpx w-28rpx color-[#215476]" />
@@ -349,16 +348,7 @@ async function togglePostLike(post: IForumPost) {
       :style="{ top: `${headerHeight}px`, backdropFilter: 'blur(6rpx)', WebkitBackdropFilter: 'blur(6rpx)' }"
     >
       <scroll-view scroll-x :show-scrollbar="false" class="w-full whitespace-nowrap">
-        <view v-if="loading" class="box-border min-w-full inline-flex gap-8rpx px-8rpx">
-          <view
-            v-for="item in skeletonTabs"
-            :key="`skeleton-tab-${item}`"
-            class="h-52rpx w-128rpx shrink-0 rd-full bg-white"
-            style="box-shadow: 0 2rpx 8rpx rgba(33,84,118,0.06)"
-          />
-        </view>
-
-        <view v-else class="box-border min-w-full inline-flex gap-8rpx px-8rpx">
+        <view class="box-border w-max inline-flex gap-8rpx px-8rpx">
           <view
             v-for="(item, index) in tabs"
             :key="item.id"
