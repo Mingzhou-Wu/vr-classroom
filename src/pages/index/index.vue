@@ -10,8 +10,27 @@ definePage({
 })
 
 const navBarOpacity = ref(0)
+const showSkeleton = ref(true)
+let skeletonTimer: ReturnType<typeof setTimeout> | null = null
+
 onPageScroll((e) => {
   navBarOpacity.value = Math.min(e.scrollTop / 300, 1)
+})
+
+const skeletonQuickList = Array.from({ length: 8 }, (_, index) => index)
+const skeletonNewsList = Array.from({ length: 2 }, (_, index) => index)
+
+onReady(() => {
+  skeletonTimer = setTimeout(() => {
+    showSkeleton.value = false
+  }, 500)
+})
+
+onUnload(() => {
+  if (skeletonTimer) {
+    clearTimeout(skeletonTimer)
+    skeletonTimer = null
+  }
 })
 
 const gridItemList = [
@@ -50,7 +69,10 @@ function goForumPage() {
 
 <template>
   <view class="min-h-screen bg-transparent">
-    <view class="z-10 w-full backdrop-blur-[6rpx] !fixed" :style="{ backgroundColor: `rgba(255, 255, 255, ${navBarOpacity})` }">
+    <view
+      class="z-10 w-full !fixed"
+      :style="{ backgroundColor: `rgba(255, 255, 255, ${navBarOpacity})`, backdropFilter: 'blur(6rpx)', WebkitBackdropFilter: 'blur(6rpx)' }"
+    >
       <wd-img src="http://10.86.136.242:9000/images/index_navbar.png" class="my-16rpx ml-16rpx h-60rpx" mode="heightFix" />
     </view>
 
@@ -58,7 +80,72 @@ function goForumPage() {
 
     <view class="h-350rpx" />
 
-    <view class="relative z-1 flex flex-col bg-[linear-gradient(180deg,rgba(243,246,249,0)_0%,#f3f6f9_14%,#f3f6f9_100%)] pb-24rpx">
+    <view v-if="showSkeleton" class="relative z-1 flex flex-col bg-[linear-gradient(180deg,rgba(243,246,249,0)_0%,#f3f6f9_14%,#f3f6f9_100%)] pb-24rpx">
+      <view class="mx-24rpx mb-16rpx flex flex-col gap-10rpx b-l-6rpx b-l-[#c9dceb] b-l-solid pl-12rpx">
+        <view class="h-20rpx w-88% rd-full bg-[#dbe8f1]" />
+        <view class="h-20rpx w-76% rd-full bg-[#e6eff5]" />
+      </view>
+
+      <view class="mx-24rpx rd-20rpx bg-[linear-gradient(165deg,#dbe8f1_0%,#f8fbfd_38%,#e5eef5_100%)] px-24rpx pb-28rpx pt-20rpx" style="box-shadow: 0 4rpx 12rpx rgba(33,84,118,0.08)">
+        <view class="flex flex-col gap-10rpx">
+          <view class="h-28rpx w-200rpx rd-full bg-[#d3e3ee]" />
+          <view class="h-22rpx w-84rpx rd-full bg-[#e2edf4]" />
+        </view>
+
+        <view class="mt-20rpx flex gap-16rpx">
+          <view class="flex flex-[2] flex-col gap-16rpx">
+            <view class="h-24rpx w-110rpx rd-full bg-[#d8e8f1]" />
+            <view class="aspect-square rd-14rpx bg-[#dfeaf2]" />
+          </view>
+
+          <view class="flex flex-[3] flex-col gap-16rpx">
+            <view class="h-24rpx w-136rpx rd-full bg-[#d8e8f1]" />
+            <view class="h-full min-h-260rpx rd-14rpx bg-[#dfeaf2]" />
+          </view>
+        </view>
+      </view>
+
+      <view class="mx-24rpx mt-16rpx flex flex-col overflow-hidden rd-20rpx bg-white px-16rpx pb-12rpx pt-14rpx" style="box-shadow: 0 4rpx 12rpx rgba(33,84,118,0.08)">
+        <view class="mb-12rpx h-34rpx w-210rpx rd-full bg-[#dbe8f1]" />
+
+        <view class="grid grid-cols-4 gap-y-18rpx">
+          <view v-for="item in skeletonQuickList" :key="`skeleton-quick-${item}`" class="flex flex-col items-center gap-16rpx py-6rpx">
+            <view class="size-100rpx rd-20rpx bg-[#eef4f8]" />
+            <view class="h-22rpx w-88rpx rd-full bg-[#dbe8f1]" />
+          </view>
+        </view>
+      </view>
+
+      <view class="mx-24rpx mt-16rpx flex flex-col overflow-hidden rd-20rpx bg-white px-16rpx pb-8rpx pt-14rpx" style="box-shadow: 0 4rpx 12rpx rgba(33,84,118,0.08)">
+        <view class="mb-12rpx h-34rpx w-210rpx rd-full bg-[#dbe8f1]" />
+
+        <view class="flex flex-col gap-0">
+          <view
+            v-for="item in skeletonNewsList"
+            :key="`skeleton-news-${item}`"
+            class="flex gap-16rpx py-18rpx"
+            :class="item !== skeletonNewsList.length - 1 ? 'b-b-1rpx b-b-solid b-b-[#e8eef3]' : ''"
+          >
+            <view class="h-160rpx w-220rpx shrink-0 rd-14rpx bg-[#e5eef5]" />
+
+            <view class="min-w-0 flex flex-1 flex-col justify-between">
+              <view class="flex flex-col gap-10rpx">
+                <view class="h-26rpx w-92% rd-full bg-[#d8e8f1]" />
+                <view class="h-20rpx w-100% rd-full bg-[#e7eff5]" />
+                <view class="h-20rpx w-68% rd-full bg-[#edf3f7]" />
+              </view>
+
+              <view class="mt-12rpx flex items-center justify-between gap-10rpx">
+                <view class="h-20rpx w-96rpx rd-full bg-[#e1ebf3]" />
+                <view class="h-40rpx w-100rpx rd-full bg-[#dbe8f1]" />
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view v-else class="relative z-1 flex flex-col bg-[linear-gradient(180deg,rgba(243,246,249,0)_0%,#f3f6f9_14%,#f3f6f9_100%)] pb-24rpx">
       <view class="mx-24rpx mb-16rpx flex flex-col b-l-6rpx b-l-[#215476] b-l-solid pl-12rpx">
         <wd-text text="武汉理工大学座椅冠名活动募集资金将全部用于学校教育基金" color="#374151" size="14rpx" />
         <wd-text text="本活动为非限定性捐赠，基金会将根据学校发展战略和规划，用于母校教育事业发展" color="#374151" size="14rpx" />

@@ -10,6 +10,8 @@ definePage({
 
 const tokenStore = useTokenStore()
 const userStore = useUserStore()
+const showSkeleton = ref(true)
+let skeletonTimer: ReturnType<typeof setTimeout> | null = null
 
 const isLogin = computed(() => tokenStore.updateNowTime().hasLogin)
 const user = computed(() => {
@@ -32,6 +34,21 @@ async function handleLogin() {
 onShow(() => {
   tokenStore.updateNowTime()
 })
+
+onReady(() => {
+  skeletonTimer = setTimeout(() => {
+    showSkeleton.value = false
+  }, 500)
+})
+
+onUnload(() => {
+  if (skeletonTimer) {
+    clearTimeout(skeletonTimer)
+    skeletonTimer = null
+  }
+})
+
+const skeletonMenuList = Array.from({ length: 5 }, (_, index) => index)
 
 function goUserPostPage() {
   uni.navigateTo({
@@ -90,7 +107,45 @@ function handleMenuTap(key: string) {
 
     <view class="h-400rpx" />
 
-    <view class="flex flex-col gap-24rpx rd-t-32rpx bg-[#f3f6f9] px-24rpx py-24rpx">
+    <view v-if="showSkeleton" class="flex flex-col gap-24rpx rd-t-32rpx bg-[#f3f6f9] px-24rpx py-24rpx">
+      <view class="rd-20rpx bg-[linear-gradient(165deg,#d4e5ed_0%,#ffffff_38%,#d8e8ef_100%)] px-24rpx py-20rpx" style="box-shadow: 0 6rpx 14rpx rgba(33,84,118,0.1)">
+        <view class="flex items-center gap-24rpx">
+          <view class="h-128rpx w-128rpx rd-full bg-[#dbe8f1]" />
+
+          <view class="flex flex-1 items-center justify-between gap-16rpx">
+            <view class="min-w-0 flex flex-col justify-center gap-12rpx">
+              <view class="h-30rpx w-180rpx rd-full bg-[#d5e4ee]" />
+              <view class="h-20rpx w-140rpx rd-full bg-[#e5eef5]" />
+              <view class="h-56rpx w-120rpx rd-full bg-[#e7eff5]" />
+            </view>
+
+            <view class="h-64rpx w-140rpx rd-full bg-[#d7e8f2]" />
+          </view>
+        </view>
+      </view>
+
+      <view class="rd-20rpx bg-white px-24rpx py-10rpx" style="box-shadow: 0 6rpx 14rpx rgba(33,84,118,0.1)">
+        <view class="h-72rpx flex items-center justify-between">
+          <view class="h-28rpx w-120rpx rd-full bg-[#d5e4ee]" />
+          <view class="h-20rpx w-72rpx rd-full bg-[#e5eef5]" />
+        </view>
+
+        <view
+          v-for="item in skeletonMenuList"
+          :key="`skeleton-menu-${item}`"
+          class="h-84rpx flex items-center justify-between"
+          :class="item !== skeletonMenuList.length - 1 ? 'b-b-1rpx b-b-solid b-b-[#edf2f6]' : ''"
+        >
+          <view class="flex items-center gap-14rpx">
+            <view class="size-34rpx rd-full bg-[#dbe8f1]" />
+            <view class="h-24rpx w-140rpx rd-full bg-[#e5eef5]" />
+          </view>
+          <view class="h-24rpx w-24rpx rd-full bg-[#edf3f7]" />
+        </view>
+      </view>
+    </view>
+
+    <view v-else class="flex flex-col gap-24rpx rd-t-32rpx bg-[#f3f6f9] px-24rpx py-24rpx">
       <view class="rd-20rpx bg-[linear-gradient(165deg,#d4e5ed_0%,#ffffff_38%,#d8e8ef_100%)] px-24rpx py-20rpx" style="box-shadow: 0 6rpx 14rpx rgba(33,84,118,0.1)">
         <view class="flex items-center gap-24rpx">
           <wd-img :src="user.avatar" class="h-128rpx w-128rpx b-4rpx b-white rd-full b-solid" mode="aspectFill" />

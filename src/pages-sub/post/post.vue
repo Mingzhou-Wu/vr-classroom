@@ -80,6 +80,8 @@ const commentBarStyle = computed(() => {
   }
 })
 
+const skeletonCommentList = Array.from({ length: 3 }, (_, index) => index)
+
 function formatDateForLocalComment(date: Date) {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -474,9 +476,62 @@ async function toggleCommentLike(comment: import('@/api/comments').IForumComment
 
 <template>
   <view class="min-h-screen bg-[#f3f6f9] px-24rpx pb-174rpx pt-24rpx">
-    <view v-if="loading" class="center flex flex-col gap-16rpx py-80rpx text-26rpx text-gray-500">
-      <wd-loading />
-      <wd-text text="加载中..." color="#475569" size="24rpx" />
+    <view v-if="loading" class="flex flex-col gap-16rpx">
+      <view class="rd-20rpx bg-white p-20rpx" style="box-shadow: 0 6rpx 14rpx rgba(33,84,118,0.08)">
+        <view class="flex flex-col gap-14rpx">
+          <view class="flex items-center gap-14rpx">
+            <view class="h-92rpx w-92rpx rd-full bg-[#dbe8f1]" />
+            <view class="min-w-0 flex flex-1 flex-col gap-8rpx">
+              <view class="h-24rpx w-120rpx rd-full bg-[#d8e8f1]" />
+              <view class="h-18rpx w-180rpx rd-full bg-[#e7eff5]" />
+            </view>
+            <view class="h-40rpx w-96rpx rd-full bg-[#dbe8f1]" />
+          </view>
+
+          <view class="flex flex-col gap-10rpx">
+            <view class="h-30rpx w-92% rd-full bg-[#d8e8f1]" />
+            <view class="h-22rpx w-100% rd-full bg-[#e7eff5]" />
+            <view class="h-22rpx w-88% rd-full bg-[#eef4f8]" />
+            <view class="h-22rpx w-72% rd-full bg-[#eef4f8]" />
+          </view>
+
+          <view class="h-420rpx rd-14rpx bg-[#e5eef5]" />
+
+          <view class="mt-4rpx flex items-center justify-between px-20rpx">
+            <view v-for="metric in 3" :key="`skeleton-post-metric-${metric}`" class="flex items-center gap-10rpx">
+              <view class="h-40rpx w-40rpx rd-full bg-[#dbe8f1]" />
+              <view class="h-22rpx w-32rpx rd-full bg-[#e7eff5]" />
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <view class="rd-20rpx bg-white p-20rpx" style="box-shadow: 0 6rpx 14rpx rgba(33,84,118,0.08)">
+        <view class="mb-12rpx flex items-center justify-between">
+          <view class="h-28rpx w-80rpx rd-full bg-[#d8e8f1]" />
+          <view class="h-20rpx w-96rpx rd-full bg-[#e7eff5]" />
+        </view>
+
+        <view class="mt-8rpx flex flex-col gap-12rpx">
+          <view v-for="item in skeletonCommentList" :key="`skeleton-comment-${item}`" class="flex flex-col gap-12rpx rd-16rpx bg-[#f7f8fa] p-16rpx">
+            <view class="flex items-center gap-12rpx">
+              <view class="h-72rpx w-72rpx rd-full bg-[#dbe8f1]" />
+
+              <view class="flex flex-col gap-8rpx">
+                <view class="h-22rpx w-120rpx rd-full bg-[#d8e8f1]" />
+                <view class="h-18rpx w-160rpx rd-full bg-[#e7eff5]" />
+              </view>
+
+              <view class="ml-auto h-24rpx w-56rpx rd-full bg-[#eef4f8]" />
+            </view>
+
+            <view class="ml-84rpx flex flex-col gap-8rpx">
+              <view class="h-22rpx w-100% rd-full bg-[#e7eff5]" />
+              <view class="h-22rpx w-72% rd-full bg-[#eef4f8]" />
+            </view>
+          </view>
+        </view>
+      </view>
     </view>
 
     <view v-else-if="!post" class="py-80rpx text-center text-26rpx text-gray-500">
@@ -521,7 +576,7 @@ async function toggleCommentLike(comment: import('@/api/comments').IForumComment
 
           <view v-if="getPostImages().length === 1" class="flex items-start justify-start">
             <view class="h-420rpx overflow-hidden rd-14rpx bg-white" @tap="handlePreviewPostImages(getPostImages()[0])">
-              <image :src="getPostImages()[0]" mode="heightFix" class="block h-full w-auto max-w-full" />
+              <image :src="getPostImages()[0]" mode="heightFix" class="block h-full max-w-full w-auto" />
             </view>
           </view>
 

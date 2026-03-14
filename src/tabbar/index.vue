@@ -69,8 +69,8 @@ onMounted(() => {
   })
 })
 // #endif
-const activeColor = '#215476'
-const inactiveColor = '#666'
+const activeColor = '#3f89b5'
+const inactiveColor = '#98a6b5'
 function getColorByIndex(index: number) {
   return tabbarStore.curIdx === index ? activeColor : inactiveColor
 }
@@ -82,7 +82,7 @@ function getColorByIndex(index: number) {
       <view class="h-50px flex items-center">
         <view
           v-for="(item, index) in tabbarList" :key="index"
-          class="flex flex-1 flex-col items-center justify-center"
+          class="mx-2 flex flex-1 flex-col items-center justify-center rounded-14px py-1 transition-all"
           :style="{ color: getColorByIndex(index) }"
           @click="handleClick(index)"
         >

@@ -63,6 +63,8 @@ const tabs = [
   { id: 9, name: '考研留学' },
   { id: 10, name: '行业资讯' },
 ]
+const skeletonTabs = Array.from({ length: 5 }, (_, index) => index)
+const skeletonPostList = Array.from({ length: 3 }, (_, index) => index)
 
 const postList = ref<IForumPost[]>([])
 const likingPostIds = ref<Set<string>>(new Set())
@@ -341,9 +343,22 @@ async function togglePostLike(post: IForumPost) {
       </view>
     </view>
 
-    <view id="forum-tabs" class="fixed z-120 w-full bg-[#f3f6f9]/95 backdrop-blur-[6rpx] px-8rpx pb-10rpx" :style="{ top: `${headerHeight}px` }">
+    <view
+      id="forum-tabs"
+      class="fixed z-120 w-full bg-[#f3f6f9]/95 px-8rpx pb-10rpx"
+      :style="{ top: `${headerHeight}px`, backdropFilter: 'blur(6rpx)', WebkitBackdropFilter: 'blur(6rpx)' }"
+    >
       <scroll-view scroll-x :show-scrollbar="false" class="w-full whitespace-nowrap">
-        <view class="box-border inline-flex min-w-full gap-8rpx px-8rpx">
+        <view v-if="loading" class="box-border inline-flex min-w-full gap-8rpx px-8rpx">
+          <view
+            v-for="item in skeletonTabs"
+            :key="`skeleton-tab-${item}`"
+            class="h-52rpx w-128rpx shrink-0 rd-full bg-white"
+            style="box-shadow: 0 2rpx 8rpx rgba(33,84,118,0.06)"
+          />
+        </view>
+
+        <view v-else class="box-border inline-flex min-w-full gap-8rpx px-8rpx">
           <view
             v-for="(item, index) in tabs"
             :key="item.id"
@@ -360,9 +375,43 @@ async function togglePostLike(post: IForumPost) {
 
     <view :style="{ height: `${topPlaceholderHeight}px` }" />
 
-    <view v-if="loading" class="center flex flex-col gap-10rpx py-80rpx text-gray-500">
-      <wd-loading />
-      <wd-text text="正在加载帖子..." color="#4b5563" size="24rpx" />
+    <view v-if="loading" class="px-16rpx pb-14rpx pt-8rpx">
+      <view
+        v-for="item in skeletonPostList"
+        :key="`skeleton-post-${item}`"
+        class="mb-16rpx rd-20rpx bg-white p-20rpx"
+        style="box-shadow: 0 6rpx 14rpx rgba(33,84,118,0.08)"
+      >
+        <view class="flex flex-col gap-14rpx">
+          <view class="flex items-center gap-14rpx">
+            <view class="h-92rpx w-92rpx rd-full bg-[#dbe8f1]" />
+
+            <view class="min-w-0 flex flex-1 flex-col gap-8rpx">
+              <view class="h-24rpx w-120rpx rd-full bg-[#d8e8f1]" />
+              <view class="h-18rpx w-180rpx rd-full bg-[#e7eff5]" />
+            </view>
+
+            <view class="h-40rpx w-96rpx rd-full bg-[#dbe8f1]" />
+          </view>
+
+          <view class="flex flex-col gap-10rpx">
+            <view class="h-28rpx w-92% rd-full bg-[#d8e8f1]" />
+            <view class="h-22rpx w-100% rd-full bg-[#e7eff5]" />
+            <view class="h-22rpx w-66% rd-full bg-[#eef4f8]" />
+          </view>
+
+          <view class="grid grid-cols-3 gap-8rpx">
+            <view v-for="cell in 3" :key="`skeleton-post-image-${item}-${cell}`" class="aspect-square rd-12rpx bg-[#e5eef5]" />
+          </view>
+
+          <view class="mt-4rpx flex items-center justify-between px-20rpx">
+            <view v-for="metric in 3" :key="`skeleton-post-metric-${item}-${metric}`" class="flex items-center gap-10rpx">
+              <view class="h-40rpx w-40rpx rd-full bg-[#dbe8f1]" />
+              <view class="h-22rpx w-32rpx rd-full bg-[#e7eff5]" />
+            </view>
+          </view>
+        </view>
+      </view>
     </view>
 
     <view v-else-if="!postList.length" class="center flex flex-col gap-10rpx py-96rpx">
