@@ -61,69 +61,86 @@ function goUserOrderPage() {
     url: '/pages-sub/order/userOrder?page=1',
   })
 }
+
+const menuList = [
+  { key: 'order', text: '我的捐赠记录', icon: 'i-mdi-receipt-text-outline' },
+  { key: 'post', text: '我的帖子', icon: 'i-mdi-post-outline' },
+  { key: 'comment', text: '我的评论', icon: 'i-mdi-comment-processing-outline' },
+  { key: 'likedPost', text: '我点赞的帖子', icon: 'i-mdi-thumb-up-outline' },
+  { key: 'likedComment', text: '我点赞的评论', icon: 'i-mdi-message-reply-text-outline' },
+]
+
+function handleMenuTap(key: string) {
+  if (key === 'order')
+    return goUserOrderPage()
+  if (key === 'post')
+    return goUserPostPage()
+  if (key === 'comment')
+    return goUserCommentPage()
+  if (key === 'likedPost')
+    return goLikedPostPage()
+  if (key === 'likedComment')
+    return goLikedCommentPage()
+}
 </script>
 
 <template>
-  <view>
+  <view class="bg-transparent">
     <wd-img src="http://10.86.136.242:9000/images/me_banner.png" class="z--1 h-420rpx w-full !fixed" mode="aspectFill" />
 
     <view class="h-400rpx" />
 
-    <view class="flex flex-col gap-24rpx rd-t-xl bg-white px-48rpx py-36rpx">
-      <view class="flex gap-40rpx pb-12rpx">
-        <wd-img :src="user.avatar" class="h-128rpx" mode="heightFix" />
+    <view class="flex flex-col gap-24rpx rd-t-32rpx bg-[#f3f6f9] px-24rpx py-24rpx">
+      <view class="rd-20rpx bg-[linear-gradient(165deg,#d4e5ed_0%,#ffffff_38%,#d8e8ef_100%)] px-24rpx py-20rpx shadow-[0_6rpx_14rpx_rgba(33,84,118,0.1)]">
+        <view class="flex items-center gap-24rpx">
+          <wd-img :src="user.avatar" class="h-128rpx w-128rpx b-4rpx b-white rd-full b-solid" mode="aspectFill" />
 
-        <view class="flex flex-1 items-center justify-between">
-          <view class="flex flex-col justify-center gap-12rpx">
-            <wd-text :text="user.name" size="36rpx" color="black" />
+          <view class="flex flex-1 items-center justify-between gap-16rpx">
+            <view class="min-w-0 flex flex-col justify-center gap-10rpx">
+              <wd-text :text="user.name" size="36rpx" color="#215476" />
+              <wd-text :text="user.collegeName || '未设置学院'" size="20rpx" color="#4b5563" />
 
-            <wd-button
-              v-if="!isLogin"
-              size="small"
-              plain
-              type="info"
-              @click="handleLogin"
-            >
-              <wd-text text="去登录" size="24rpx" />
-            </wd-button>
+              <wd-button
+                v-if="!isLogin"
+                class="!h-56rpx !b-[#215476] !rd-full !px-20rpx"
+                size="small"
+                plain
+                type="info"
+                @click="handleLogin"
+              >
+                <wd-text text="去登录" size="22rpx" color="#215476" />
+              </wd-button>
 
-            <wd-button v-else size="small" plain type="info">
-              <wd-text :text="isLogin ? '已登录' : '去登录'" size="24rpx" />
+              <view v-else class="h-56rpx w-max flex items-center rd-full bg-[#e7eff5] px-18rpx">
+                <wd-text text="已登录" size="22rpx" color="#215476" />
+              </view>
+            </view>
+
+            <wd-button class="!h-64rpx !rd-full !bg-[#215476] !px-24rpx" size="small">
+              <wd-text text="个人资料" size="24rpx" color="white" />
             </wd-button>
           </view>
-
-          <wd-button class="!bg-[#215476]" size="small">
-            <wd-text text="个人资料" size="28rpx" color="white" />
-          </wd-button>
         </view>
       </view>
 
-      <wd-gap bg-color="#eeeeee" class="!mx--48rpx" />
-
-      <view>
-        <view class="h-72rpx flex items-center justify-between" @tap="goUserOrderPage">
-          <wd-text text="我的捐赠记录" size="30rpx" color="black" />
-          <wd-text text=">" size="36rpx" color="gray" />
+      <view class="rd-20rpx bg-white px-24rpx py-10rpx shadow-[0_6rpx_14rpx_rgba(33,84,118,0.1)]">
+        <view class="h-72rpx flex items-center justify-between">
+          <wd-text text="我的服务" size="30rpx" color="#215476" />
+          <wd-text text="共5项" size="20rpx" color="#6b7280" />
         </view>
 
-        <view class="h-72rpx flex items-center justify-between" @tap="goUserPostPage">
-          <wd-text text="我的帖子" size="30rpx" color="black" />
-          <wd-text text=">" size="36rpx" color="gray" />
-        </view>
-
-        <view class="h-72rpx flex items-center justify-between" @tap="goUserCommentPage">
-          <wd-text text="我的评论" size="30rpx" color="black" />
-          <wd-text text=">" size="36rpx" color="gray" />
-        </view>
-
-        <view class="h-72rpx flex items-center justify-between" @tap="goLikedPostPage">
-          <wd-text text="我点赞的帖子" size="30rpx" color="black" />
-          <wd-text text=">" size="36rpx" color="gray" />
-        </view>
-
-        <view class="h-72rpx flex items-center justify-between" @tap="goLikedCommentPage">
-          <wd-text text="我点赞的评论" size="30rpx" color="black" />
-          <wd-text text=">" size="36rpx" color="gray" />
+        <view
+          v-for="(item, index) in menuList"
+          :key="item.key"
+          class="h-84rpx flex items-center justify-between"
+          :class="index !== menuList.length - 1 ? 'b-b-1rpx b-b-solid b-b-[#edf2f6]' : ''"
+          @tap="handleMenuTap(item.key)"
+        >
+          <view class="flex items-center gap-14rpx">
+            <view :class="item.icon" class="size-34rpx color-[#215476]" />
+            <wd-text :text="item.text" size="28rpx" color="#1f2937" />
+          </view>
+          <view class="i-mdi-chevron-right size-34rpx color-[#94a3b8]" />
         </view>
       </view>
     </view>
