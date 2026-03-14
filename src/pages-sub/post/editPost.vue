@@ -259,7 +259,8 @@ function handleChooseImages() {
     sizeType: ['compressed'],
     sourceType: ['album', 'camera'],
     success: async (res) => {
-      const filePaths = (res.tempFilePaths || []).filter(Boolean)
+      const rawFilePaths = res.tempFilePaths
+      const filePaths = (Array.isArray(rawFilePaths) ? rawFilePaths : [rawFilePaths]).filter(Boolean)
       if (!filePaths.length)
         return
 
@@ -345,7 +346,7 @@ onLoad((options) => {
 
           <view
             v-if="imageUrls.length < POST_IMAGE_MAX_COUNT"
-            class="h-200rpx w-200rpx center rd-12rpx b-2rpx b-dashed b-#d0d5dd bg-#fafbfc text-50rpx text-#98a2b3"
+            class="h-200rpx w-200rpx center b-2rpx b-#d0d5dd rd-12rpx b-dashed bg-#fafbfc text-50rpx text-#98a2b3"
             @tap="handleChooseImages"
           >
             +

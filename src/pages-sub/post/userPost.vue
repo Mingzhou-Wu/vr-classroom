@@ -37,6 +37,8 @@ onPageScroll((e) => {
 })
 
 function getStatusText(status?: number) {
+  if (status === -1)
+    return '已删除'
   if (status === 0)
     return '待审核'
   if (status === 1)
@@ -298,7 +300,7 @@ async function togglePostLike(post: IUserPostCard) {
             <view class="h-max flex rd-xl bg-#215476 px-12rpx py-8rpx">
               <wd-text :text="post.categoryName || '未分类'" size="20rpx" color="white" />
             </view>
-            <view class="h-max flex rd-xl px-12rpx py-8rpx" :class="post.status === 2 ? 'bg-#d03050' : post.status === 1 ? 'bg-#2d8c4d' : 'bg-#e6a23c'">
+            <view class="h-max flex rd-xl px-12rpx py-8rpx" :class="post.status === 2 ? 'bg-#d03050' : post.status === 1 ? 'bg-#2d8c4d' : post.status === -1 ? 'bg-#909399' : 'bg-#e6a23c'">
               <wd-text :text="getStatusText(post.status)" size="20rpx" color="white" />
             </view>
           </view>
