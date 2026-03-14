@@ -397,8 +397,10 @@ async function togglePostLike(post: IForumPost) {
             <wd-text :text="post.summary" size="24rpx" color="#334155" :lines="2" />
           </view>
 
-          <view v-if="getPostImages(post).length === 1" class="h-420rpx flex items-start justify-start overflow-hidden rd-14rpx bg-white" @tap.stop="handlePreviewPostImages(post, getPostImages(post)[0])">
-            <image :src="getPostImages(post)[0]" mode="heightFix" class="block h-full w-auto max-w-full" />
+          <view v-if="getPostImages(post).length === 1" class="flex items-start justify-start">
+            <view class="h-420rpx overflow-hidden rd-14rpx bg-white" @tap.stop="handlePreviewPostImages(post, getPostImages(post)[0])">
+              <image :src="getPostImages(post)[0]" mode="heightFix" class="block h-full w-auto max-w-full" />
+            </view>
           </view>
 
           <view v-else-if="getPostImages(post).length > 1" class="grid grid-cols-3 gap-8rpx" @tap.stop>

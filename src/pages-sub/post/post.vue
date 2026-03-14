@@ -208,10 +208,10 @@ async function handlePublishComment() {
       content: value,
       postId: normalizedPostId,
     })
-    console.log('发表评论返回:', response)
+    console.log('发布评论返回:', response)
 
     uni.showToast({
-      title: '发表成功',
+      title: '发布成功',
       icon: 'success',
     })
 
@@ -246,7 +246,7 @@ async function handlePublishComment() {
     commentText.value = ''
   }
   catch (error) {
-    console.error('发表评论失败', error)
+    console.error('发布评论失败', error)
     uni.showToast({
       title: getErrorMessage(error),
       icon: 'none',
@@ -473,112 +473,123 @@ async function toggleCommentLike(comment: import('@/api/comments').IForumComment
 </script>
 
 <template>
-  <view class="px-36rpx pb-174rpx pt-48rpx">
-    <view v-if="loading" class="center flex flex-col gap-16rpx py-40rpx text-26rpx text-gray-500">
+  <view class="min-h-screen bg-[#f3f6f9] px-24rpx pb-174rpx pt-24rpx">
+    <view v-if="loading" class="center flex flex-col gap-16rpx py-80rpx text-26rpx text-gray-500">
       <wd-loading />
-      <wd-text text="加载中..." color="black" size="24rpx" />
+      <wd-text text="加载中..." color="#475569" size="24rpx" />
     </view>
 
-    <view v-else-if="!post" class="py-40rpx text-center text-26rpx text-gray-500">
+    <view v-else-if="!post" class="py-80rpx text-center text-26rpx text-gray-500">
       <wd-loadmore state="finished" finished-text="该帖子好像飞走啦" />
     </view>
 
     <view v-else class="flex flex-col gap-16rpx">
       <view
         v-if="myPostReviewNoticeText"
-        class="rd-12rpx px-16rpx py-12rpx text-24rpx"
+        class="rd-16rpx px-16rpx py-12rpx text-24rpx"
         :class="myPostReviewNoticeClass"
       >
         {{ myPostReviewNoticeText }}
       </view>
 
       <view v-if="isMyPost" class="flex justify-end gap-12rpx">
-        <view class="center flex b-2rpx b-#215476 rd-xl b-solid bg-white px-12rpx py-4rpx" @tap.stop="goEditPostPage">
+        <view class="center flex b-2rpx b-#215476 rd-full b-solid bg-white px-16rpx py-8rpx" @tap.stop="goEditPostPage">
           <wd-text text="修改" size="22rpx" color="#215476" />
         </view>
-        <view class="center flex b-2rpx b-#d03050 rd-xl b-solid bg-white px-12rpx py-4rpx" @tap.stop="openDeleteConfirm">
+        <view class="center flex b-2rpx b-#d03050 rd-full b-solid bg-white px-16rpx py-8rpx" @tap.stop="openDeleteConfirm">
           <wd-text text="删除" size="22rpx" color="#d03050" />
         </view>
       </view>
 
-      <view class="flex items-center gap-16rpx">
-        <wd-img :src="post.author.avatar" class="h-104rpx" mode="heightFix" />
-        <view class="flex flex-col gap-2rpx">
-          <wd-text :text="post.author.name" size="30rpx" color="black" />
-          <wd-text :text="formatAuthorMeta(post.author.collegeName, post.date)" size="22rpx" color="#999999" />
-        </view>
-        <view class="ml-auto h-max flex rd-xl bg-#215476 px-12rpx py-8rpx">
-          <wd-text :text="post.categoryName || '-'" size="20rpx" color="white" />
-        </view>
-      </view>
-
-      <view class="flex flex-col gap-8rpx">
-        <wd-text :text="post.title || '-'" size="32rpx" color="black" bold />
-        <wd-text :text="post.content || '-'" size="24rpx" color="black" />
-      </view>
-
-      <view v-if="getPostImages().length === 1" class="h-420rpx overflow-hidden rd-16rpx bg-#f7f8fa" @tap="handlePreviewPostImages(getPostImages()[0])">
-        <image :src="getPostImages()[0]" mode="aspectFill" class="h-full w-full" />
-      </view>
-
-      <view v-else-if="getPostImages().length > 1" class="grid grid-cols-3 gap-8rpx">
-        <view
-          v-for="(imageUrl, index) in getPostImages()"
-          :key="`${post.id}-${index}`"
-          class="aspect-square overflow-hidden rd-10rpx bg-#f7f8fa"
-          @tap="handlePreviewPostImages(imageUrl)"
-        >
-          <image :src="imageUrl" mode="aspectFill" class="h-full w-full" />
-        </view>
-      </view>
-
-      <view class="flex justify-between px-24rpx">
-        <view class="center flex gap-8rpx">
-          <view class="i-majesticons-share-line size-42rpx bg-black" />
-          <wd-text :text="post.shareCount || 0" size="24rpx" color="black" />
-        </view>
-
-        <view class="center flex gap-8rpx">
-          <view class="i-majesticons-comment-2-text-line size-42rpx bg-black" />
-          <wd-text :text="post.commentCount || 0" size="24rpx" color="black" />
-        </view>
-
-        <view class="center flex gap-8rpx" @tap="toggleCurrentPostLike">
-          <view v-if="post.isLiked" class="i-majesticons:thumb-up size-42rpx bg-#ff3040" />
-          <view v-else class="i-majesticons-thumb-up-line size-42rpx bg-black" />
-          <wd-text :text="post.likeCount || 0" size="24rpx" color="black" />
-        </view>
-      </view>
-
-      <view class="mt-8rpx flex flex-col gap-12rpx">
-        <wd-text text="评论" size="26rpx" color="black" bold />
-
-        <view v-if="commentsLoading" class="center flex flex-col gap-16rpx py-24rpx text-22rpx text-gray-500">
-          <wd-loading />
-          <wd-text text="评论加载中..." color="black" size="22rpx" />
-        </view>
-
-        <view v-for="comment in commentsLoading ? [] : commentList" :key="comment.id" class="flex flex-col gap-12rpx rd-12rpx bg-#f7f8fa p-16rpx">
-          <view class="flex items-center gap-12rpx">
-            <wd-img :src="comment.commenter.avatar" class="h-72rpx" mode="heightFix" />
-
-            <view class="flex flex-col gap-2rpx">
-              <wd-text :text="comment.commenter.name" size="30rpx" color="black" />
-              <wd-text :text="formatAuthorMeta(comment.commenter.collegeName, comment.date)" size="22rpx" color="#999999" />
+      <view class="rd-20rpx bg-white p-20rpx" style="box-shadow: 0 6rpx 14rpx rgba(33,84,118,0.08)">
+        <view class="flex flex-col gap-14rpx">
+          <view class="flex items-center gap-14rpx">
+            <wd-img :src="post.author.avatar" class="h-92rpx w-92rpx rd-full bg-[#f1f5f9]" mode="aspectFill" />
+            <view class="min-w-0 flex flex-col gap-4rpx">
+              <wd-text :text="post.author.name" size="30rpx" color="#1f2937" />
+              <wd-text :text="formatAuthorMeta(post.author.collegeName, post.date)" size="21rpx" color="#6b7280" />
             </view>
-
-            <view class="ml-auto center gap-4rpx pr-8rpx" @tap.stop="toggleCommentLike(comment)">
-              <view v-if="comment.isLiked" class="i-majesticons:thumb-up size-30rpx bg-#ff3040" />
-              <view v-else class="i-majesticons-thumb-up-line size-30rpx bg-black" />
-              <wd-text :text="comment.likeCount || 0" size="20rpx" color="black" />
+            <view class="ml-auto h-max flex rd-full bg-#215476 px-16rpx py-8rpx">
+              <wd-text :text="post.categoryName || '-'" size="20rpx" color="white" />
             </view>
           </view>
 
-          <wd-text :text="comment.content || '-'" size="24rpx" color="black" class="px-84rpx" />
+          <view class="flex flex-col gap-8rpx">
+            <wd-text :text="post.title || '-'" size="32rpx" color="#0f172a" bold />
+            <wd-text :text="post.content || '-'" size="24rpx" color="#334155" />
+          </view>
+
+          <view v-if="getPostImages().length === 1" class="flex items-start justify-start">
+            <view class="h-420rpx overflow-hidden rd-14rpx bg-white" @tap="handlePreviewPostImages(getPostImages()[0])">
+              <image :src="getPostImages()[0]" mode="heightFix" class="block h-full w-auto max-w-full" />
+            </view>
+          </view>
+
+          <view v-else-if="getPostImages().length > 1" class="grid grid-cols-3 gap-8rpx">
+            <view
+              v-for="(imageUrl, index) in getPostImages()"
+              :key="`${post.id}-${index}`"
+              class="aspect-square overflow-hidden rd-12rpx bg-#f7f8fa"
+              @tap="handlePreviewPostImages(imageUrl)"
+            >
+              <image :src="imageUrl" mode="aspectFill" class="h-full w-full" />
+            </view>
+          </view>
+
+          <view class="mt-4rpx flex items-center justify-between px-20rpx">
+            <view class="center flex gap-10rpx">
+              <view class="i-majesticons-share-line size-40rpx bg-[#64748b]" />
+              <wd-text :text="post.shareCount || 0" size="24rpx" color="#475569" />
+            </view>
+
+            <view class="center flex gap-10rpx">
+              <view class="i-majesticons-comment-2-text-line size-40rpx bg-[#64748b]" />
+              <wd-text :text="post.commentCount || 0" size="24rpx" color="#475569" />
+            </view>
+
+            <view class="center flex gap-10rpx" @tap="toggleCurrentPostLike">
+              <view v-if="post.isLiked" class="i-majesticons:thumb-up size-40rpx bg-#ff3040" />
+              <view v-else class="i-majesticons-thumb-up-line size-40rpx bg-[#64748b]" />
+              <wd-text :text="post.likeCount || 0" size="24rpx" :color="post.isLiked ? '#ff3040' : '#475569'" />
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <view class="rd-20rpx bg-white p-20rpx" style="box-shadow: 0 6rpx 14rpx rgba(33,84,118,0.08)">
+        <view class="mb-12rpx flex items-center justify-between">
+          <wd-text text="评论" size="28rpx" color="#215476" bold />
+          <wd-text :text="`共 ${post.commentCount || 0} 条`" size="20rpx" color="#64748b" />
         </view>
 
-        <view v-if="!commentsLoading" class="text-center">
-          <wd-loadmore :state="commentLoadMoreState" :finished-text="commentList.length ? '没有更多评论了' : '暂无评论，快来抢沙发'" />
+        <view class="mt-8rpx flex flex-col gap-12rpx">
+          <view v-if="commentsLoading" class="center flex flex-col gap-16rpx py-24rpx text-22rpx text-gray-500">
+            <wd-loading />
+            <wd-text text="评论加载中..." color="#475569" size="22rpx" />
+          </view>
+
+          <view v-for="comment in commentsLoading ? [] : commentList" :key="comment.id" class="flex flex-col gap-12rpx rd-16rpx bg-#f7f8fa p-16rpx">
+            <view class="flex items-center gap-12rpx">
+              <wd-img :src="comment.commenter.avatar" class="h-72rpx w-72rpx rd-full bg-white" mode="aspectFill" />
+
+              <view class="flex flex-col gap-2rpx">
+                <wd-text :text="comment.commenter.name" size="28rpx" color="#1f2937" />
+                <wd-text :text="formatAuthorMeta(comment.commenter.collegeName, comment.date)" size="21rpx" color="#6b7280" />
+              </view>
+
+              <view class="ml-auto center gap-4rpx pr-8rpx" @tap.stop="toggleCommentLike(comment)">
+                <view v-if="comment.isLiked" class="i-majesticons:thumb-up size-30rpx bg-#ff3040" />
+                <view v-else class="i-majesticons-thumb-up-line size-30rpx bg-[#64748b]" />
+                <wd-text :text="comment.likeCount || 0" size="20rpx" :color="comment.isLiked ? '#ff3040' : '#475569'" />
+              </view>
+            </view>
+
+            <wd-text :text="comment.content || '-'" size="24rpx" color="#334155" class="px-84rpx" />
+          </view>
+
+          <view v-if="!commentsLoading" class="text-center">
+            <wd-loadmore :state="commentLoadMoreState" :finished-text="commentList.length ? '没有更多评论了' : '暂无评论，快来抢沙发'" />
+          </view>
         </view>
       </view>
     </view>
@@ -586,7 +597,8 @@ async function toggleCommentLike(comment: import('@/api/comments').IForumComment
 
   <view
     v-if="post"
-    class="fixed bottom-0 left-0 right-0 z-120 bg-white px-24rpx pt-16rpx shadow-md pb-safe"
+    class="fixed bottom-0 left-0 right-0 z-120 bg-white px-24rpx pt-16rpx pb-safe"
+    style="box-shadow: 0 -4rpx 12rpx rgba(33,84,118,0.08)"
     :style="commentBarStyle"
   >
     <view class="flex items-center gap-16rpx pb-16rpx">
@@ -600,8 +612,8 @@ async function toggleCommentLike(comment: import('@/api/comments').IForumComment
         @keyboardheightchange="handleInputKeyboardHeightChange"
       />
 
-      <wd-button type="primary" size="small" :loading="publishing" class="!b-#215476 !rounded-999rpx !bg-#215476 !px-20rpx" @click="handlePublishComment">
-        发表
+      <wd-button type="primary" size="small" :loading="publishing" class="!b-[#215476] !rounded-999rpx !bg-[#215476] !px-20rpx !color-white" @click="handlePublishComment">
+        发布
       </wd-button>
     </view>
   </view>
