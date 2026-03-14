@@ -91,7 +91,7 @@ function handleMenuTap(key: string) {
     <view class="h-400rpx" />
 
     <view class="flex flex-col gap-24rpx rd-t-32rpx bg-[#f3f6f9] px-24rpx py-24rpx">
-      <view class="rd-20rpx bg-[linear-gradient(165deg,#d4e5ed_0%,#ffffff_38%,#d8e8ef_100%)] px-24rpx py-20rpx shadow-[0_6rpx_14rpx_rgba(33,84,118,0.1)]">
+      <view class="rd-20rpx bg-[linear-gradient(165deg,#d4e5ed_0%,#ffffff_38%,#d8e8ef_100%)] px-24rpx py-20rpx" style="box-shadow: 0 6rpx 14rpx rgba(33,84,118,0.1)">
         <view class="flex items-center gap-24rpx">
           <wd-img :src="user.avatar" class="h-128rpx w-128rpx b-4rpx b-white rd-full b-solid" mode="aspectFill" />
 
@@ -123,7 +123,7 @@ function handleMenuTap(key: string) {
         </view>
       </view>
 
-      <view class="rd-20rpx bg-white px-24rpx py-10rpx shadow-[0_6rpx_14rpx_rgba(33,84,118,0.1)]">
+      <view class="rd-20rpx bg-white px-24rpx py-10rpx" style="box-shadow: 0 6rpx 14rpx rgba(33,84,118,0.1)">
         <view class="h-72rpx flex items-center justify-between">
           <wd-text text="我的服务" size="30rpx" color="#215476" />
           <wd-text text="共5项" size="20rpx" color="#6b7280" />

@@ -330,23 +330,29 @@ async function togglePostLike(post: IForumPost) {
 </script>
 
 <template>
-  <view>
-    <view id="forum-header" class="fixed left-0 right-0 z-100 center flex flex-col bg-white p-16rpx">
-      <wd-text text="连接母校与校友的交流社区" size="16rpx" color="black" />
-      <wd-search v-model="keyword" placeholder-left placeholder="搜索帖子" cancel-txt="搜索" @cancel="handleSearch" />
+  <view class="min-h-screen bg-[#f3f6f9]">
+    <view id="forum-header" class="fixed left-0 right-0 z-100 flex flex-col gap-10rpx bg-[linear-gradient(180deg,#eaf2f8_0%,#f3f6f9_100%)] px-16rpx pt-16rpx pb-12rpx">
+      <view class="flex items-center justify-center gap-8rpx">
+        <view class="i-mdi-forum-outline h-28rpx w-28rpx color-[#215476]" />
+        <wd-text text="连接母校与校友的交流社区" size="22rpx" color="#215476" />
+      </view>
+      <view class="rd-14rpx bg-white px-8rpx py-6rpx" style="box-shadow: 0 4rpx 12rpx rgba(33,84,118,0.08)">
+        <wd-search v-model="keyword" placeholder-left placeholder="搜索帖子" cancel-txt="搜索" @cancel="handleSearch" />
+      </view>
     </view>
 
-    <view id="forum-tabs" class="fixed z-120 w-full b-b-1rpx b-#f0f0f0 b-b-solid bg-white" :style="{ top: `${headerHeight}px` }">
+    <view id="forum-tabs" class="fixed z-120 w-full bg-[#f3f6f9]/95 backdrop-blur-[6rpx] px-8rpx pb-10rpx" :style="{ top: `${headerHeight}px` }">
       <scroll-view scroll-x :show-scrollbar="false" class="w-full whitespace-nowrap">
-        <view class="box-border min-w-full inline-flex px-16rpx">
+        <view class="box-border inline-flex min-w-full gap-8rpx px-8rpx">
           <view
             v-for="(item, index) in tabs"
             :key="item.id"
-            class="relative px-18rpx py-20rpx"
+            class="rd-full px-20rpx py-12rpx"
+            :class="tab === index ? 'bg-[#215476]' : 'bg-white b-1rpx b-solid b-[#dbe7f0]'"
+            :style="tab === index ? 'box-shadow: 0 4rpx 10rpx rgba(33,84,118,0.2)' : ''"
             @click="handleTabChange(index)"
           >
-            <wd-text :text="item.name" :color="tab === index ? '#215476' : '#666666'" size="26rpx" />
-            <view v-if="tab === index" class="absolute bottom-6rpx left-20% right-20% h-4rpx rd-999px bg-#215476" />
+            <wd-text :text="item.name" :color="tab === index ? '#ffffff' : '#4b5563'" size="24rpx" />
           </view>
         </view>
       </scroll-view>
@@ -354,65 +360,78 @@ async function togglePostLike(post: IForumPost) {
 
     <view :style="{ height: `${topPlaceholderHeight}px` }" />
 
-    <view v-if="loading" class="center flex flex-col gap-8rpx py-40rpx text-gray-500">
+    <view v-if="loading" class="center flex flex-col gap-10rpx py-80rpx text-gray-500">
       <wd-loading />
-      <wd-text text="加载中..." color="black" size="24rpx" />
+      <wd-text text="正在加载帖子..." color="#4b5563" size="24rpx" />
     </view>
 
-    <wd-card v-for="post in loading ? [] : postList" :key="post.id" :data="post" type="rectangle" @tap="goPostPage(post.id)">
-      <view class="flex flex-col gap-16rpx">
-        <view class="flex items-center gap-16rpx">
-          <wd-img :src="post.author.avatar" class="h-104rpx" mode="heightFix" />
+    <view v-else-if="!postList.length" class="center flex flex-col gap-10rpx py-96rpx">
+      <view class="i-mdi-file-document-outline h-56rpx w-56rpx color-[#94a3b8]" />
+      <wd-text text="暂无帖子，去发布第一条吧" color="#64748b" size="24rpx" />
+    </view>
 
-          <view class="flex flex-col justify-center gap-2rpx">
-            <wd-text :text="post.author.name" size="30rpx" color="black" />
-            <wd-text :text="formatAuthorMeta(post.author.collegeName, post.date)" size="22rpx" color="#999999" />
+    <view v-else class="px-16rpx pb-14rpx pt-8rpx">
+      <view
+        v-for="post in postList"
+        :key="post.id"
+        class="mb-16rpx rd-20rpx bg-white p-20rpx"
+        style="box-shadow: 0 6rpx 14rpx rgba(33,84,118,0.08)"
+        @tap="goPostPage(post.id)"
+      >
+        <view class="flex flex-col gap-14rpx">
+          <view class="flex items-center gap-14rpx">
+            <wd-img :src="post.author.avatar" class="h-92rpx w-92rpx rd-full bg-[#f1f5f9]" mode="aspectFill" />
+
+            <view class="min-w-0 flex flex-col justify-center gap-4rpx">
+              <wd-text :text="post.author.name" size="30rpx" color="#1f2937" />
+              <wd-text :text="formatAuthorMeta(post.author.collegeName, post.date)" size="21rpx" color="#6b7280" />
+            </view>
+
+            <view class="ml-auto h-max flex rd-full bg-[#215476] px-16rpx py-8rpx">
+              <wd-text :text="post.categoryName || '推荐'" size="20rpx" color="white" />
+            </view>
           </view>
 
-          <view class="ml-auto h-max flex rd-xl bg-#215476 px-12rpx py-8rpx">
-            <wd-text :text="post.categoryName" size="20rpx" color="white" />
-          </view>
-        </view>
-
-        <view class="flex flex-col gap-8rpx">
-          <wd-text :text="post.title" size="30rpx" color="black" bold />
-          <wd-text :text="post.summary" size="24rpx" color="black" :lines="1" />
-        </view>
-
-        <view v-if="getPostImages(post).length === 1" class="h-360rpx overflow-hidden rd-12rpx bg-#f7f8fa" @tap.stop="handlePreviewPostImages(post, getPostImages(post)[0])">
-          <image :src="getPostImages(post)[0]" mode="aspectFill" class="h-full w-full" />
-        </view>
-
-        <view v-else-if="getPostImages(post).length > 1" class="grid grid-cols-3 gap-8rpx" @tap.stop>
-          <view
-            v-for="(imageUrl, index) in getPostImages(post)"
-            :key="`${post.id}-${index}`"
-            class="aspect-square overflow-hidden rd-10rpx bg-#f7f8fa"
-            @tap.stop="handlePreviewPostImages(post, imageUrl)"
-          >
-            <image :src="imageUrl" mode="aspectFill" class="h-full w-full" />
-          </view>
-        </view>
-
-        <view class="flex justify-between px-24rpx">
-          <view class="center flex gap-8rpx">
-            <view class="i-majesticons-share-line size-42rpx bg-black" />
-            <wd-text :text="post.shareCount" size="24rpx" color="black" />
+          <view class="flex flex-col gap-8rpx">
+            <wd-text :text="post.title" size="30rpx" color="#0f172a" bold />
+            <wd-text :text="post.summary" size="24rpx" color="#334155" :lines="2" />
           </view>
 
-          <view class="center flex gap-8rpx">
-            <view class="i-majesticons-comment-2-text-line size-42rpx bg-black" />
-            <wd-text :text="post.commentCount" size="24rpx" color="black" />
+          <view v-if="getPostImages(post).length === 1" class="h-420rpx flex items-start justify-start overflow-hidden rd-14rpx bg-white" @tap.stop="handlePreviewPostImages(post, getPostImages(post)[0])">
+            <image :src="getPostImages(post)[0]" mode="heightFix" class="block h-full w-auto max-w-full" />
           </view>
 
-          <view class="center flex gap-8rpx" @tap.stop="togglePostLike(post)">
-            <view v-if="post.isLiked" class="i-majesticons:thumb-up size-42rpx bg-#ff3040" />
-            <view v-else class="i-majesticons-thumb-up-line size-42rpx bg-black" />
-            <wd-text :text="post.likeCount" size="24rpx" color="black" />
+          <view v-else-if="getPostImages(post).length > 1" class="grid grid-cols-3 gap-8rpx" @tap.stop>
+            <view
+              v-for="(imageUrl, index) in getPostImages(post)"
+              :key="`${post.id}-${index}`"
+              class="aspect-square overflow-hidden rd-12rpx bg-[#f7f8fa]"
+              @tap.stop="handlePreviewPostImages(post, imageUrl)"
+            >
+              <image :src="imageUrl" mode="aspectFill" class="h-full w-full" />
+            </view>
+          </view>
+
+          <view class="mt-4rpx flex items-center justify-between px-20rpx">
+            <view class="center flex gap-10rpx">
+              <view class="i-majesticons-share-line size-40rpx bg-[#64748b]" />
+              <wd-text :text="post.shareCount" size="24rpx" color="#475569" />
+            </view>
+
+            <view class="center flex gap-10rpx">
+              <view class="i-majesticons-comment-2-text-line size-40rpx bg-[#64748b]" />
+              <wd-text :text="post.commentCount" size="24rpx" color="#475569" />
+            </view>
+
+            <view class="center flex gap-10rpx" @tap.stop="togglePostLike(post)">
+              <view v-if="post.isLiked" class="i-majesticons:thumb-up size-40rpx bg-[#ff3040]" />
+              <view v-else class="i-majesticons-thumb-up-line size-40rpx bg-[#64748b]" />
+              <wd-text :text="post.likeCount" size="24rpx" :color="post.isLiked ? '#ff3040' : '#475569'" />
+            </view>
           </view>
         </view>
       </view>
-    </wd-card>
+    </view>
 
     <view v-if="!loading" class="text-center">
       <wd-loadmore :state="loadMoreState" finished-text="没有更多帖子了" />
@@ -420,15 +439,15 @@ async function togglePostLike(post: IForumPost) {
 
     <wd-fab :active="true" :gap="{ top: 16, left: 16, right: 16, bottom: 96 }" position="left-bottom">
       <template #trigger>
-        <view class="size-96rpx center flex rd-50% bg-#215476" @tap="goCreatePostPage">
+        <view class="size-96rpx center flex rd-50% bg-#215476" style="box-shadow: 0 4rpx 12rpx rgba(33,84,118,0.16)" @tap="goCreatePostPage">
           <view class="i-material-symbols-add-rounded size-48rpx bg-white" />
         </view>
       </template>
-      <view class="size-96rpx center flex rd-50% bg-#215476" @click="handleRefresh">
+      <view class="size-96rpx center flex rd-50% bg-#215476" style="box-shadow: 0 4rpx 12rpx rgba(33,84,118,0.16)" @click="handleRefresh">
         <view class="i-material-symbols-refresh-rounded size-48rpx bg-white" />
       </view>
     </wd-fab>
 
-    <wd-backtop :scroll-top="pageScrollTop" :right="16" :bottom="96" custom-class="!size-96rpx !bg-#215476 !color-white" :top="600" />
+    <wd-backtop :scroll-top="pageScrollTop" :right="16" :bottom="96" custom-class="!size-96rpx !bg-#215476 !color-white" custom-style="box-shadow: 0 4rpx 12rpx rgba(33,84,118,0.16)" :top="600" />
   </view>
 </template>
