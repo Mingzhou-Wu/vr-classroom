@@ -445,9 +445,6 @@ async function toggleCommentLike(comment: IUserCommentCard) {
         </view>
         <wd-text text="还没有发布过评论" size="30rpx" color="#1f2937" bold />
         <wd-text text="去社区参与讨论，留下你的观点和反馈。" size="24rpx" color="#64748b" :lines="2" />
-        <view class="mt-24rpx inline-flex rd-full bg-[#215476] px-28rpx py-16rpx" @tap="handleRefresh">
-          <wd-text text="重新加载" size="24rpx" color="#ffffff" />
-        </view>
       </view>
     </view>
 

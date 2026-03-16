@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import type { IForumPost, IGetPostsResponse } from '@/api/posts'
 import { getPosts, likePost, unlikePost } from '@/api/posts'
+import { useTokenStore, useUserStore } from '@/store'
 import { debounce } from '@/utils/debounce'
 
 definePage({
@@ -9,6 +10,8 @@ definePage({
   },
 })
 
+const tokenStore = useTokenStore()
+const userStore = useUserStore()
 const keyword = ref('')
 const tab = ref(0)
 const headerHeight = ref(0)
@@ -17,6 +20,10 @@ const pageScrollTop = ref(0)
 const PAGE_SCROLL_SYNC_INTERVAL_MS = 100
 const lastPageScrollSyncAt = ref(0)
 const topPlaceholderHeight = computed(() => headerHeight.value + tabsHeight.value)
+const isLogin = computed(() => tokenStore.updateNowTime().hasLogin)
+const needsVerify = computed(() => isLogin.value && Number((userStore.userInfo as any)?.verifyStatus) === 0)
+const showLoginPopup = ref(false)
+const popupMode = ref<'login' | 'verify'>('login')
 
 onPageScroll((e) => {
   const now = Date.now()
@@ -286,6 +293,18 @@ onUnload(() => {
   debouncedFetchPostList.cancel()
 })
 
+function openLoginPopup(mode: 'login' | 'verify' = 'login') {
+  popupMode.value = mode
+  showLoginPopup.value = true
+}
+
+function goPopupAction() {
+  showLoginPopup.value = false
+  uni.switchTab({
+    url: '/pages/me/me',
+  })
+}
+
 function goPostPage(postId: string) {
   uni.navigateTo({
     url: `/pages-sub/post/post?id=${postId}`,
@@ -293,12 +312,27 @@ function goPostPage(postId: string) {
 }
 
 function goCreatePostPage() {
+  if (!isLogin.value) {
+    openLoginPopup('login')
+    return
+  }
+
+  if (needsVerify.value) {
+    openLoginPopup('verify')
+    return
+  }
+
   uni.navigateTo({
     url: '/pages-sub/post/editPost',
   })
 }
 
 async function togglePostLike(post: IForumPost) {
+  if (!isLogin.value) {
+    openLoginPopup('login')
+    return
+  }
+
   const targetPostId = String(post.id || '')
   if (!targetPostId || likingPostIds.value.has(targetPostId))
     return
@@ -490,5 +524,24 @@ async function togglePostLike(post: IForumPost) {
     </wd-fab>
 
     <wd-backtop :scroll-top="pageScrollTop" :right="16" :bottom="96" custom-class="!size-96rpx !bg-#215476 !color-white" custom-style="box-shadow: 0 4rpx 12rpx rgba(33,84,118,0.16)" :top="600" />
+
+    <wd-popup
+      v-model="showLoginPopup"
+      position="center"
+      :close-on-click-modal="true"
+      :show-close-icon="false"
+      custom-style="border-radius: 28rpx; overflow: hidden; background: transparent;"
+    >
+      <view class="max-w-[calc(100vw-64rpx)] w-620rpx flex flex-col overflow-hidden rd-28rpx bg-[linear-gradient(180deg,#f8fbfd_0%,#edf4f8_100%)] p-32rpx shadow-[0_18rpx_40rpx_rgba(33,84,118,0.18)]">
+        <wd-text :text="popupMode === 'verify' ? '认证后即可继续' : '登录后即可继续'" size="34rpx" color="#16364d" custom-class="font-600 leading-[1.4]" />
+        <wd-text :text="popupMode === 'verify' ? '需要先认证账号才可继续浏览和参与社区互动' : '需要先登录账号才可继续浏览和参与社区互动'" size="24rpx" color="#4b5563" custom-class="mt-16rpx leading-[1.7]" />
+        <button
+          class="mt-32rpx h-84rpx w-full rd-full border-none bg-[#215476] text-28rpx color-white font-600 line-height-[84rpx]"
+          @tap="goPopupAction"
+        >
+          {{ popupMode === 'verify' ? '去认证' : '去登录' }}
+        </button>
+      </view>
+    </wd-popup>
   </view>
 </template>

@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import type { IWxPhoneLoginUser } from '@/api/login'
 import type { IAuthLoginRes } from '@/api/types/login'
-import { bindPhone, wxMiniLogin } from '@/api/login'
+import { wxMiniLogin } from '@/api/login'
 import { useTokenStore, useUserStore } from '@/store'
 import { defaultUserInfo } from '@/store/user'
 
@@ -15,8 +15,8 @@ const tokenStore = useTokenStore()
 const userStore = useUserStore()
 const showSkeleton = ref(true)
 const loginLoading = ref(false)
-const bindPhoneLoading = ref(false)
-const needBindPhone = ref(false)
+const showLoginPopup = ref(false)
+const popupMode = ref<'login' | 'verify'>('login')
 let skeletonTimer: ReturnType<typeof setTimeout> | null = null
 
 const isLogin = computed(() => tokenStore.updateNowTime().hasLogin)
@@ -38,13 +38,6 @@ const profileActionText = computed(() => {
   return '个人资料'
 })
 
-interface WechatPhoneEvent {
-  detail?: {
-    code?: string
-    errMsg?: string
-  }
-}
-
 function applyToken(token: string) {
   tokenStore.setTokenInfo({
     token,
@@ -59,7 +52,9 @@ function applyLoginUser(userInfo: IWxPhoneLoginUser | null) {
 }
 
 async function handleLogin() {
-  if (isLogin.value || loginLoading.value || needBindPhone.value) {
+  showLoginPopup.value = false
+
+  if (isLogin.value || loginLoading.value) {
     return
   }
 
@@ -88,20 +83,19 @@ async function handleLogin() {
     })
 
     applyToken(response.token)
-
-    if (response.needBindPhone) {
-      needBindPhone.value = true
-      userStore.clearUserInfo()
-      return
-    }
-
-    needBindPhone.value = false
     applyLoginUser(response.user)
-    if (!response.user) {
-      await userStore.fetchUserInfo()
+
+    if (!response.user || response.needBindPhone) {
+      try {
+        await userStore.fetchUserInfo()
+      }
+      catch (error) {
+        console.warn('登录后获取用户信息失败:', error)
+      }
     }
+
     uni.showToast({
-      title: '登录成功',
+      title: response.needBindPhone ? '登录成功，可稍后绑定手机号' : '登录成功',
       icon: 'success',
     })
   }
@@ -116,46 +110,22 @@ async function handleLogin() {
   }
 }
 
-async function handleGetPhoneNumber(event: WechatPhoneEvent) {
-  if (!needBindPhone.value || bindPhoneLoading.value) {
-    return
-  }
-
-  const phoneCode = event.detail?.code
-  const errMsg = event.detail?.errMsg || ''
-
-  if (!phoneCode) {
-    uni.showToast({
-      title: errMsg && !errMsg.includes(':ok') ? '需要授权手机号才能完成登录' : '获取手机号失败，请重试',
-      icon: 'none',
-    })
-    return
-  }
-
-  bindPhoneLoading.value = true
-
-  try {
-    await bindPhone({ phoneCode })
-    await userStore.fetchUserInfo()
-    needBindPhone.value = false
-
-    uni.showToast({
-      title: '登录成功',
-      icon: 'success',
-    })
-  }
-  catch {
-    uni.showToast({
-      title: '手机号授权失败，请重试',
-      icon: 'none',
-    })
-  }
-  finally {
-    bindPhoneLoading.value = false
-  }
+function handleVerify() {
 }
 
-function handleVerify() {
+function openAccessPopup(mode: 'login' | 'verify' = 'login') {
+  popupMode.value = mode
+  showLoginPopup.value = true
+}
+
+function handlePopupAction() {
+  if (popupMode.value === 'verify') {
+    showLoginPopup.value = false
+    handleVerify()
+    return
+  }
+
+  handleLogin()
 }
 
 function handleProfileAction() {
@@ -219,7 +189,7 @@ function goUserOrderPage() {
 }
 
 const menuList = [
-  { key: 'order', text: '我的捐赠记录', icon: 'i-material-symbols-receipt-long-rounded' },
+  { key: 'order', text: '我的捐赠', icon: 'i-material-symbols-receipt-long-rounded' },
   { key: 'post', text: '我的帖子', icon: 'i-material-symbols-article-rounded' },
   { key: 'comment', text: '我的评论', icon: 'i-material-symbols-comment-rounded' },
   { key: 'likedPost', text: '我点赞的帖子', icon: 'i-material-symbols-thumb-up-rounded' },
@@ -227,11 +197,13 @@ const menuList = [
 ]
 
 function handleMenuTap(key: string) {
-  if (needBindPhone.value) {
-    uni.showToast({
-      title: '请先完成手机号授权',
-      icon: 'none',
-    })
+  if (!isLogin.value) {
+    openAccessPopup('login')
+    return
+  }
+
+  if (key === 'order' && needsVerify.value) {
+    openAccessPopup('verify')
     return
   }
 
@@ -332,29 +304,21 @@ function handleMenuTap(key: string) {
     </view>
 
     <wd-popup
-      v-model="needBindPhone"
+      v-model="showLoginPopup"
       position="center"
-      :close-on-click-modal="false"
+      :close-on-click-modal="true"
       :show-close-icon="false"
       custom-style="border-radius: 28rpx; overflow: hidden; background: transparent;"
     >
-      <view class="max-w-[calc(100vw-64rpx)] w-620rpx overflow-hidden rd-28rpx bg-[linear-gradient(180deg,#f8fbfd_0%,#edf4f8_100%)] p-32rpx shadow-[0_18rpx_40rpx_rgba(33,84,118,0.18)]">
-        <view class="text-34rpx color-[#16364d] font-600 leading-[1.4]">
-          完成登录还差一步
-        </view>
-        <view class="mt-16rpx text-24rpx color-[#4b5563] leading-[1.7]">
-          当前账号必须先授权微信手机号，授权成功后才会进入个人中心。
-        </view>
+      <view class="max-w-[calc(100vw-64rpx)] w-620rpx flex flex-col overflow-hidden rd-28rpx bg-[linear-gradient(180deg,#f8fbfd_0%,#edf4f8_100%)] p-32rpx shadow-[0_18rpx_40rpx_rgba(33,84,118,0.18)]">
+        <wd-text :text="popupMode === 'verify' ? '认证后即可继续' : '登录后即可继续'" size="34rpx" color="#16364d" custom-class="font-600 leading-[1.4]" />
+        <wd-text :text="popupMode === 'verify' ? '需要先登录账号才可继续查看我的捐赠' : '需要先登录账号才可继续查看和使用我的服务。'" size="24rpx" color="#4b5563" custom-class="mt-16rpx leading-[1.7]" />
         <button
           class="mt-32rpx h-84rpx w-full rd-full border-none bg-[#215476] text-28rpx color-white font-600 line-height-[84rpx]"
-          open-type="getPhoneNumber"
-          @getphonenumber="handleGetPhoneNumber"
+          @tap="handlePopupAction"
         >
-          {{ bindPhoneLoading ? '授权中...' : '授权手机号并完成登录' }}
+          {{ popupMode === 'verify' ? '去认证' : '去登录' }}
         </button>
-        <view class="mt-18rpx text-center text-22rpx color-[#6b7280] leading-[1.6]">
-          未完成授权前，本页其他操作将暂时不可用。
-        </view>
       </view>
     </wd-popup>
   </view>

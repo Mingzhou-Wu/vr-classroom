@@ -2,7 +2,7 @@
 import type { IForumPostDetail } from '@/api/posts'
 import { createComment, getComments, likeComment, unlikeComment } from '@/api/comments'
 import { deletePost, getPostById, likePost, unlikePost } from '@/api/posts'
-import { useUserStore } from '@/store'
+import { useTokenStore, useUserStore } from '@/store'
 
 definePage({
   style: {
@@ -33,6 +33,7 @@ const togglingLike = ref(false)
 const togglingCommentLikeIds = ref<Set<string>>(new Set())
 const FORUM_NEED_REFRESH_KEY = 'forum:need-refresh-once'
 const USER_POST_NEED_REFRESH_KEY = 'user-post:need-refresh-once'
+const tokenStore = useTokenStore()
 const userStore = useUserStore()
 
 const currentUserId = computed(() => {
@@ -63,6 +64,10 @@ const myPostReviewNoticeClass = computed(() => {
     return 'bg-#fff2f0 b-2rpx b-#d03050 b-solid text-#d03050'
   return 'bg-#fff7e6 b-2rpx b-#e6a23c b-solid text-#e6a23c'
 })
+const isLogin = computed(() => tokenStore.updateNowTime().hasLogin)
+const needsVerify = computed(() => isLogin.value && Number((userStore.userInfo as any)?.verifyStatus) === 0)
+const showAccessPopup = ref(false)
+const popupMode = ref<'login' | 'verify'>('login')
 
 onPageScroll((e) => {
   const now = Date.now()
@@ -174,7 +179,29 @@ function getErrorMessage(error: unknown) {
   return errorObj?.message || errorObj?.msg || errorObj?.data?.message || errorObj?.data?.msg || '获取帖子详情失败'
 }
 
+function openAccessPopup(mode: 'login' | 'verify' = 'login') {
+  popupMode.value = mode
+  showAccessPopup.value = true
+}
+
+function goPopupAction() {
+  showAccessPopup.value = false
+  uni.switchTab({
+    url: '/pages/me/me',
+  })
+}
+
 async function handlePublishComment() {
+  if (!isLogin.value) {
+    openAccessPopup('login')
+    return
+  }
+
+  if (needsVerify.value) {
+    openAccessPopup('verify')
+    return
+  }
+
   const value = commentText.value.trim()
   if (!value) {
     uni.showToast({
@@ -389,6 +416,11 @@ async function confirmDeletePost() {
 }
 
 async function toggleCurrentPostLike() {
+  if (!isLogin.value) {
+    openAccessPopup('login')
+    return
+  }
+
   if (!post.value?.id || togglingLike.value)
     return
 
@@ -724,6 +756,24 @@ async function toggleCommentLike(comment: import('@/api/comments').IForumComment
           </wd-button>
         </view>
       </view>
+    </view>
+  </wd-popup>
+  <wd-popup
+    v-model="showAccessPopup"
+    position="center"
+    :close-on-click-modal="true"
+    :show-close-icon="false"
+    custom-style="border-radius: 28rpx; overflow: hidden; background: transparent;"
+  >
+    <view class="max-w-[calc(100vw-64rpx)] w-620rpx flex flex-col overflow-hidden rd-28rpx bg-[linear-gradient(180deg,#f8fbfd_0%,#edf4f8_100%)] p-32rpx shadow-[0_18rpx_40rpx_rgba(33,84,118,0.18)]">
+      <wd-text :text="popupMode === 'verify' ? '认证后即可继续' : '登录后即可继续'" size="34rpx" color="#16364d" custom-class="font-600 leading-[1.4]" />
+      <wd-text :text="popupMode === 'verify' ? '需要先认证账号才可继续浏览和参与社区互动' : '需要先登录账号才可继续浏览和参与社区互动'" size="24rpx" color="#4b5563" custom-class="mt-16rpx leading-[1.7]" />
+      <button
+        class="mt-32rpx h-84rpx w-full rd-full border-none bg-[#215476] text-28rpx color-white font-600 line-height-[84rpx]"
+        @tap="goPopupAction"
+      >
+        {{ popupMode === 'verify' ? '去认证' : '去登录' }}
+      </button>
     </view>
   </wd-popup>
 </template>

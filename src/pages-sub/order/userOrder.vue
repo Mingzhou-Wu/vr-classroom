@@ -4,7 +4,7 @@ import { getOrders } from '@/api/orders'
 
 definePage({
   style: {
-    navigationBarTitleText: '我的捐赠记录',
+    navigationBarTitleText: '我的捐赠',
   },
 })
 

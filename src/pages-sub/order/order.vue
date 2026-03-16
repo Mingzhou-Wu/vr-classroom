@@ -2,6 +2,7 @@
 import type { IRoomSeat, IRoomSeatsData } from '@/api/rooms'
 import { createOrder, mockPayNotify } from '@/api/orders'
 import { getRoomSeats } from '@/api/rooms'
+import { useTokenStore, useUserStore } from '@/store'
 
 definePage({
   style: {
@@ -9,6 +10,8 @@ definePage({
   },
 })
 
+const tokenStore = useTokenStore()
+const userStore = useUserStore()
 const roomId = ref('')
 const roomSeatsData = ref<IRoomSeatsData>({
   totalRows: 0,
@@ -18,6 +21,11 @@ const roomSeatsData = ref<IRoomSeatsData>({
 const loading = ref(false)
 const paying = ref(false)
 const selectedSeatIds = ref<string[]>([])
+const showLoginPopup = ref(false)
+const popupMode = ref<'login' | 'verify'>('login')
+
+const isLogin = computed(() => tokenStore.updateNowTime().hasLogin)
+const needsVerify = computed(() => isLogin.value && Number((userStore.userInfo as any)?.verifyStatus) === 0)
 
 const MAX_SELECT_COUNT = 6
 
@@ -150,7 +158,29 @@ function getErrorMessage(error: unknown) {
   return errorObj?.message || errorObj?.msg || errorObj?.data?.message || errorObj?.data?.msg || '操作失败'
 }
 
+function openLoginPopup(mode: 'login' | 'verify' = 'login') {
+  popupMode.value = mode
+  showLoginPopup.value = true
+}
+
+function goPopupAction() {
+  showLoginPopup.value = false
+  uni.switchTab({
+    url: '/pages/me/me',
+  })
+}
+
 async function goPay() {
+  if (!isLogin.value) {
+    openLoginPopup('login')
+    return
+  }
+
+  if (needsVerify.value) {
+    openLoginPopup('verify')
+    return
+  }
+
   if (!selectedSeatIds.value.length)
     return
 
@@ -337,5 +367,24 @@ onLoad((query) => {
     </view>
 
     <view class="h-32rpx" />
+
+    <wd-popup
+      v-model="showLoginPopup"
+      position="center"
+      :close-on-click-modal="true"
+      :show-close-icon="false"
+      custom-style="border-radius: 28rpx; overflow: hidden; background: transparent;"
+    >
+      <view class="max-w-[calc(100vw-64rpx)] w-620rpx flex flex-col overflow-hidden rd-28rpx bg-[linear-gradient(180deg,#f8fbfd_0%,#edf4f8_100%)] p-32rpx shadow-[0_18rpx_40rpx_rgba(33,84,118,0.18)]">
+        <wd-text :text="popupMode === 'verify' ? '认证后即可继续' : '登录后即可继续'" size="34rpx" color="#16364d" custom-class="font-600 leading-[1.4]" />
+        <wd-text :text="popupMode === 'verify' ? '需要先认证账号才可继续捐赠' : '需要先登录账号才可继续捐赠'" size="24rpx" color="#4b5563" custom-class="mt-16rpx leading-[1.7]" />
+        <button
+          class="mt-32rpx h-84rpx w-full rd-full border-none bg-[#215476] text-28rpx color-white font-600 line-height-[84rpx]"
+          @tap="goPopupAction"
+        >
+          {{ popupMode === 'verify' ? '去认证' : '去登录' }}
+        </button>
+      </view>
+    </wd-popup>
   </view>
 </template>
