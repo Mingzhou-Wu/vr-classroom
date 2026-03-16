@@ -20,6 +20,7 @@ const commentsCurrentPage = ref(1)
 const commentsTotalPage = ref(1)
 const publishing = ref(false)
 const commentText = ref('')
+const COMMENT_MAX_LENGTH = 200
 const pageScrollTop = ref(0)
 const PAGE_SCROLL_SYNC_INTERVAL_MS = 100
 const lastPageScrollSyncAt = ref(0)
@@ -178,6 +179,14 @@ async function handlePublishComment() {
   if (!value) {
     uni.showToast({
       title: '请输入评论内容',
+      icon: 'none',
+    })
+    return
+  }
+
+  if (value.length > COMMENT_MAX_LENGTH) {
+    uni.showToast({
+      title: `评论内容不能超过${COMMENT_MAX_LENGTH}字`,
       icon: 'none',
     })
     return
@@ -642,6 +651,7 @@ async function toggleCommentLike(comment: import('@/api/comments').IForumComment
           placeholder="说点什么吧..."
           class="flex-1"
           clearable
+          :maxlength="COMMENT_MAX_LENGTH"
           :adjust-position="false"
           @keyboardheightchange="handleInputKeyboardHeightChange"
         />

@@ -26,6 +26,7 @@ const loadingMore = ref(false)
 const currentPage = ref(1)
 const totalPage = ref(1)
 const confirmPopupVisible = ref(false)
+const commentActionVisible = ref(false)
 const deleting = ref(false)
 const deletingCommentId = ref('')
 const likingCommentIds = ref<Set<string>>(new Set())
@@ -33,6 +34,7 @@ const USER_COMMENT_NEED_REFRESH_KEY = 'user-comment:need-refresh-once'
 const pageScrollTop = ref(0)
 const PAGE_SCROLL_SYNC_INTERVAL_MS = 100
 const lastPageScrollSyncAt = ref(0)
+const skeletonCommentList = Array.from({ length: 4 }, (_, index) => index)
 
 onPageScroll((e) => {
   const now = Date.now()
@@ -44,6 +46,8 @@ onPageScroll((e) => {
 })
 
 function getStatusText(status?: number) {
+  if (status === -1)
+    return '已删除'
   if (status === 0)
     return '待审核'
   if (status === 1)
@@ -51,6 +55,48 @@ function getStatusText(status?: number) {
   if (status === 2)
     return '已驳回'
   return '未知状态'
+}
+
+function getStatusBadgeClass(status?: number) {
+  if (status === 2)
+    return 'bg-[#fff1f2] text-[#be123c] b-1rpx b-solid b-[#fecdd3]'
+  if (status === 1)
+    return 'bg-[#ecfdf3] text-[#166534] b-1rpx b-solid b-[#bbf7d0]'
+  if (status === -1)
+    return 'bg-[#f1f5f9] text-[#64748b] b-1rpx b-solid b-[#cbd5e1]'
+  return 'bg-[#fff7ed] text-[#c2410c] b-1rpx b-solid b-[#fed7aa]'
+}
+
+function getStatusTextColor(status?: number) {
+  if (status === 2)
+    return '#be123c'
+  if (status === 1)
+    return '#166534'
+  if (status === -1)
+    return '#64748b'
+  return '#c2410c'
+}
+
+function getStatusPanelClass(status?: number) {
+  if (status === 2)
+    return 'bg-[#fff6f7] b-[#fecdd3]'
+  if (status === -1)
+    return 'bg-[#f8fafc] b-[#dbe4ee]'
+  return 'bg-[#fffaf2] b-[#fde2b8]'
+}
+
+function shouldShowStatusHint(status?: number) {
+  return status === 0 || status === 2 || status === -1
+}
+
+function getStatusHint(comment: IUserCommentCard) {
+  if (comment.status === 2)
+    return comment.rejectReason ? `驳回原因：${comment.rejectReason}` : '评论未通过审核，请修改后重新提交。'
+  if (comment.status === 0)
+    return '评论正在等待审核，审核通过后会展示在帖子下方。'
+  if (comment.status === -1)
+    return '这条评论已被删除，不会再展示在帖子详情中。'
+  return ''
 }
 
 function normalizeRecord(record: IUserCommentRecord): IUserCommentCard {
@@ -89,14 +135,28 @@ function formatPublishTime(dateText?: string) {
   if (Number.isNaN(publishedAt.getTime()))
     return ''
 
-  const utc8Date = new Date(publishedAt.getTime() + 8 * 60 * 60 * 1000)
-  const year = utc8Date.getUTCFullYear()
-  const month = String(utc8Date.getUTCMonth() + 1).padStart(2, '0')
-  const day = String(utc8Date.getUTCDate()).padStart(2, '0')
-  const hour = String(utc8Date.getUTCHours()).padStart(2, '0')
-  const minute = String(utc8Date.getUTCMinutes()).padStart(2, '0')
-  const second = String(utc8Date.getUTCSeconds()).padStart(2, '0')
-  return `${year}-${month}-${day} ${hour}:${minute}:${second}`
+  const diffMs = Date.now() - publishedAt.getTime()
+  if (diffMs < 0)
+    return '刚刚'
+
+  if (diffMs < 60 * 1000)
+    return '刚刚'
+
+  const diffMinutes = Math.floor(diffMs / (60 * 1000))
+  if (diffMinutes < 60)
+    return `${diffMinutes}分钟前`
+
+  const diffHours = Math.floor(diffMs / (60 * 60 * 1000))
+  if (diffHours < 24)
+    return `${diffHours}小时前`
+
+  const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000))
+  const month = String(publishedAt.getMonth() + 1).padStart(2, '0')
+  const day = String(publishedAt.getDate()).padStart(2, '0')
+  if (diffDays > 365)
+    return `${publishedAt.getFullYear()}-${month}-${day}`
+
+  return `${month}-${day}`
 }
 
 function formatPublishMeta(dateText?: string) {
@@ -185,9 +245,40 @@ function goPostPage(postId?: string) {
   })
 }
 
-function openDeleteConfirm(commentId: string) {
+function handleRefresh() {
+  if (loading.value || loadingMore.value)
+    return
+
+  uni.pageScrollTo({
+    scrollTop: 0,
+    duration: 0,
+  })
+  currentPage.value = 1
+  totalPage.value = 1
+  commentList.value = []
+  fetchCommentList()
+}
+
+function openCommentActionSheet(commentId: string) {
   deletingCommentId.value = commentId
-  confirmPopupVisible.value = true
+  commentActionVisible.value = true
+}
+
+function handleCommentActionSelect(event: { item?: { key?: string } }) {
+  const actionKey = event?.item?.key
+  commentActionVisible.value = false
+
+  const targetComment = commentList.value.find(item => item.id === deletingCommentId.value)
+  if (!targetComment)
+    return
+
+  if (actionKey === 'edit') {
+    goEditCommentPage(targetComment)
+    return
+  }
+
+  if (actionKey === 'delete')
+    confirmPopupVisible.value = true
 }
 
 function goEditCommentPage(comment: IUserCommentCard) {
@@ -201,6 +292,7 @@ function goEditCommentPage(comment: IUserCommentCard) {
 }
 
 function closeDeleteConfirm() {
+  commentActionVisible.value = false
   if (deleting.value)
     return
 
@@ -268,69 +360,172 @@ async function toggleCommentLike(comment: IUserCommentCard) {
 </script>
 
 <template>
-  <view class="pb-20rpx pt-16rpx">
-    <view v-if="loading" class="center flex flex-col gap-8rpx py-40rpx text-gray-500">
-      <wd-loading />
-      <wd-text text="加载中..." color="black" size="24rpx" />
+  <view class="min-h-screen overflow-x-hidden bg-[#f3f6f9] pb-20rpx">
+    <view v-if="loading" class="px-16rpx pt-16rpx">
+      <view
+        v-for="item in skeletonCommentList"
+        :key="`user-comment-skeleton-${item}`"
+        class="mb-16rpx rd-20rpx bg-white p-20rpx"
+        style="box-shadow: 0 6rpx 14rpx rgba(33,84,118,0.08)"
+      >
+        <view class="flex flex-col gap-14rpx">
+          <view class="flex items-center justify-between gap-12rpx">
+            <view class="h-22rpx w-180rpx rd-full bg-[#dbe8f1]" />
+            <view class="flex gap-8rpx">
+              <view class="h-40rpx w-96rpx rd-full bg-[#dbe8f1]" />
+              <view class="h-40rpx w-112rpx rd-full bg-[#e5eef5]" />
+              <view class="h-40rpx w-96rpx rd-full bg-[#dbe8f1]" />
+            </view>
+          </view>
+          <view class="h-28rpx w-82% rd-full bg-[#d8e8f1]" />
+          <view class="h-28rpx w-100% rd-full bg-[#e7eff5]" />
+          <view class="h-28rpx w-64% rd-full bg-[#eef4f8]" />
+          <view class="h-92rpx w-full rd-16rpx bg-[#f5f9fc]" />
+          <view class="h-68rpx w-full rd-16rpx bg-[#f8fbfd]" />
+        </view>
+      </view>
     </view>
 
-    <wd-card v-for="comment in loading ? [] : commentList" :key="comment.id" :data="comment" type="rectangle" @tap="goPostPage(comment.relatedPostId)">
-      <view class="flex flex-col gap-16rpx">
-        <view class="flex items-center justify-between gap-12rpx">
-          <wd-text :text="formatPublishMeta(comment.date)" size="22rpx" color="#999999" />
-
-          <view class="h-max flex rd-xl px-12rpx py-8rpx" :class="comment.status === 2 ? 'bg-#d03050' : comment.status === 1 ? 'bg-#2d8c4d' : 'bg-#e6a23c'">
-            <wd-text :text="getStatusText(comment.status)" size="20rpx" color="white" />
-          </view>
+    <view v-else-if="!commentList.length" class="px-16rpx pt-16rpx">
+      <view class="rd-24rpx bg-white px-24rpx py-64rpx text-center" style="box-shadow: 0 8rpx 18rpx rgba(33,84,118,0.08)">
+        <view class="mx-auto mb-18rpx h-120rpx w-120rpx center rd-full bg-[#edf4f8]">
+          <view class="i-material-symbols-comment-bank-outline-rounded h-60rpx w-60rpx color-[#7a95ab]" />
         </view>
-
-        <view class="flex flex-col gap-8rpx">
-          <wd-text :text="comment.content" size="28rpx" color="black" :lines="3" />
-          <wd-text :text="`评论于：${comment.relatedPostTitle}`" size="24rpx" color="#215476" :lines="1" />
-          <wd-text
-            v-if="comment.status === 2 && comment.rejectReason"
-            :text="`驳回原因：${comment.rejectReason}`"
-            size="22rpx"
-            color="#d03050"
-            :lines="2"
-          />
+        <wd-text text="还没有发布过评论" size="30rpx" color="#1f2937" bold />
+        <wd-text text="去社区参与讨论，留下你的观点和反馈。" size="24rpx" color="#64748b" :lines="2" />
+        <view class="mt-24rpx inline-flex rd-full bg-[#215476] px-28rpx py-16rpx" @tap="handleRefresh">
+          <wd-text text="重新加载" size="24rpx" color="#ffffff" />
         </view>
+      </view>
+    </view>
 
-        <view class="flex items-center justify-end gap-16rpx px-8rpx">
-          <view class="mr-12rpx center flex gap-8rpx" @tap.stop="toggleCommentLike(comment)">
-            <view v-if="comment.isLiked" class="i-majesticons:thumb-up size-42rpx bg-#ff3040" />
-            <view v-else class="i-majesticons-thumb-up-line size-42rpx bg-black" />
-            <wd-text :text="comment.likeCount" size="24rpx" color="black" />
+    <view v-else class="px-16rpx pt-16rpx">
+      <view
+        v-for="comment in commentList"
+        :key="comment.id"
+        class="mb-16rpx rd-20rpx bg-white p-20rpx"
+        style="box-shadow: 0 6rpx 14rpx rgba(33,84,118,0.08)"
+        @tap="goPostPage(comment.relatedPostId)"
+      >
+        <view class="flex flex-col gap-14rpx">
+          <view class="flex items-center justify-between gap-12rpx">
+            <wd-text :text="formatPublishMeta(comment.date)" size="22rpx" color="#6b7280" />
+
+            <view class="ml-auto flex items-center gap-8rpx">
+              <view class="center flex shrink-0 gap-8rpx rd-full bg-[#f8fbfd] px-16rpx py-10rpx" @tap.stop="toggleCommentLike(comment)">
+                <view v-if="comment.isLiked" class="i-majesticons:thumb-up size-34rpx bg-[#ff3040]" />
+                <view v-else class="i-majesticons-thumb-up-line size-34rpx bg-[#64748b]" />
+                <wd-text :text="comment.likeCount" size="22rpx" :color="comment.isLiked ? '#ff3040' : '#475569'" />
+              </view>
+              <view class="center flex rd-full px-16rpx py-8rpx" :class="getStatusBadgeClass(comment.status)">
+                <wd-text :text="getStatusText(comment.status)" size="20rpx" :color="getStatusTextColor(comment.status)" />
+              </view>
+              <view class="center flex b-2rpx b-#cfe0eb rd-full b-solid bg-[#f8fbfd] px-18rpx py-8rpx" @tap.stop="openCommentActionSheet(comment.id)">
+                <wd-text text="编辑" size="22rpx" color="#215476" />
+              </view>
+            </view>
           </view>
-          <view class="center flex b-2rpx b-#215476 rd-xl b-solid bg-white px-12rpx py-4rpx" @tap.stop="goEditCommentPage(comment)">
-            <wd-text text="修改" size="24rpx" color="#215476" />
+
+          <view class="flex flex-col gap-8rpx">
+            <wd-text :text="comment.content || '这条评论暂时没有内容'" size="28rpx" color="#0f172a" :lines="4" bold />
           </view>
-          <view class="center flex b-2rpx b-#d03050 rd-xl b-solid bg-white px-12rpx py-4rpx" @tap.stop="openDeleteConfirm(comment.id)">
-            <wd-text text="删除" size="24rpx" color="#d03050" />
+
+          <view
+            class="flex items-center gap-16rpx rd-16rpx bg-[linear-gradient(135deg,#f8fbfd_0%,#edf4f8_100%)] px-18rpx py-16rpx"
+            @tap.stop="goPostPage(comment.relatedPostId)"
+          >
+            <view class="h-52rpx w-52rpx flex items-center justify-center rd-14rpx bg-white shadow-[0_6rpx_12rpx_rgba(33,84,118,0.08)]">
+              <view class="i-material-symbols-article-outline-rounded size-30rpx color-[#215476]" />
+            </view>
+            <view class="min-w-0 flex-1">
+              <wd-text text="评论所在帖子" size="20rpx" color="#64748b" />
+              <wd-text :text="comment.relatedPostTitle || '未知帖子'" size="24rpx" color="#16364d" :lines="2" bold />
+            </view>
+          </view>
+
+          <view
+            v-if="shouldShowStatusHint(comment.status)"
+            class="b-1rpx rd-16rpx b-solid px-16rpx py-14rpx"
+            :class="getStatusPanelClass(comment.status)"
+          >
+            <wd-text :text="getStatusHint(comment)" size="22rpx" color="#475569" :lines="3" />
           </view>
         </view>
       </view>
-    </wd-card>
+    </view>
 
-    <wd-popup v-model="confirmPopupVisible" position="center" custom-style="width: 560rpx; border-radius: 24rpx;">
-      <view class="flex flex-col gap-24rpx p-32rpx">
-        <wd-text text="确认删除这条评论吗？" size="30rpx" color="black" />
-        <wd-text text="删除后不可恢复" size="24rpx" color="#999999" />
-        <view class="flex justify-center gap-16rpx">
-          <wd-button plain @click="closeDeleteConfirm">
-            <wd-text text="取消" size="24rpx" color="black" />
-          </wd-button>
-          <wd-button type="error" :loading="deleting" @click="confirmDeleteComment">
-            <wd-text text="确认删除" size="24rpx" color="white" />
-          </wd-button>
+    <wd-popup
+      v-model="commentActionVisible"
+      position="center"
+      root-portal
+      :z-index="300"
+      custom-style="width: 560rpx; border-radius: 28rpx; overflow: hidden; background: transparent;"
+    >
+      <view class="overflow-hidden rd-28rpx bg-[linear-gradient(180deg,#f8fbfd_0%,#eef4f8_100%)] shadow-[0_22rpx_44rpx_rgba(33,84,118,0.18)]">
+        <view class="flex flex-col px-32rpx py-26rpx text-center">
+          <wd-text text="评论管理" size="30rpx" color="#16364d" bold />
+          <wd-text text="选择你想进行的操作" size="22rpx" color="#64748b" class="mt-8rpx" />
+        </view>
+        <view class="px-20rpx pb-20rpx">
+          <view class="flex flex-col gap-12rpx">
+            <view class="h-88rpx center flex rd-22rpx bg-white shadow-[0_8rpx_18rpx_rgba(33,84,118,0.08)]" @tap="handleCommentActionSelect({ item: { key: 'edit' } })">
+              <wd-text text="修改评论" size="26rpx" color="#215476" />
+            </view>
+            <view class="h-88rpx center flex rd-22rpx bg-[#fff1f2]" @tap="handleCommentActionSelect({ item: { key: 'delete' } })">
+              <wd-text text="删除评论" size="26rpx" color="#d03050" />
+            </view>
+          </view>
         </view>
       </view>
     </wd-popup>
 
-    <view v-if="!loading" class="text-center">
+    <wd-popup
+      v-model="confirmPopupVisible"
+      position="center"
+      root-portal
+      :z-index="320"
+      :close-on-click-modal="false"
+      custom-style="width: 620rpx; border-radius: 28rpx; overflow: hidden; background: transparent;"
+    >
+      <view class="overflow-hidden rd-28rpx bg-[linear-gradient(180deg,#fff8f8_0%,#ffffff_30%,#fffafa_100%)] shadow-[0_24rpx_48rpx_rgba(120,25,25,0.18)]">
+        <view class="b-b-1rpx b-[#f3d4d8] b-solid bg-[linear-gradient(135deg,#fff1f2_0%,#ffe4e6_100%)] px-32rpx py-24rpx">
+          <view class="flex items-center gap-14rpx">
+            <view class="h-64rpx w-64rpx flex items-center justify-center rd-full bg-[#d03050]/12">
+              <view class="i-material-symbols-delete-outline-rounded size-34rpx color-[#d03050]" />
+            </view>
+            <view class="min-w-0 flex flex-1 flex-col">
+              <wd-text text="确认删除评论" size="30rpx" color="#881337" bold />
+              <wd-text text="删除后这条评论及其互动记录将无法恢复。" size="22rpx" color="#9f1239" class="mt-6rpx" />
+            </view>
+          </view>
+        </view>
+        <view class="px-32rpx py-28rpx">
+          <view class="rd-20rpx bg-[#fff5f5] px-20rpx py-18rpx">
+            <wd-text text="如果只是想调整表达内容，建议先使用修改评论；只有确定不再保留时再执行删除。" size="22rpx" color="#7f1d1d" class="leading-[1.7]" />
+          </view>
+          <view class="mt-28rpx flex gap-16rpx">
+            <wd-button plain class="!h-80rpx !flex-1 !b-[#d7dee5] !rd-full !bg-white" @click="closeDeleteConfirm">
+              <wd-text text="先不删" size="24rpx" color="#475569" />
+            </wd-button>
+            <wd-button type="error" :loading="deleting" class="shadow-[0_12rpx_24rpx_rgba(208,48,80,0.24)] !h-80rpx !flex-1 !rd-full !b-none !bg-[#d03050]" @click="confirmDeleteComment">
+              <wd-text text="确认删除" size="24rpx" color="white" />
+            </wd-button>
+          </view>
+        </view>
+      </view>
+    </wd-popup>
+
+    <view v-if="!loading && commentList.length" class="pb-10rpx text-center">
       <wd-loadmore :state="loadMoreState" finished-text="没有更多评论了" />
     </view>
 
-    <wd-backtop :scroll-top="pageScrollTop" :right="16" :bottom="96" custom-class="!size-96rpx !bg-#215476 !color-white" :top="600" />
+    <wd-backtop
+      :scroll-top="pageScrollTop"
+      :right="16"
+      :bottom="96"
+      custom-class="!size-96rpx !bg-#215476 !color-white"
+      custom-style="box-shadow: 0 4rpx 12rpx rgba(33,84,118,0.16)"
+      :top="600"
+    />
   </view>
 </template>
