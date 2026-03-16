@@ -9,12 +9,14 @@ definePage({
 
 const title = ref('')
 const content = ref('')
-const categoryIndex = ref(0)
+const categoryIndex = ref(-1)
+const categoryValue = ref<number[]>([])
 const postId = ref('')
 const pageLoading = ref(false)
 const submitting = ref(false)
 const uploading = ref(false)
 const imageUrls = ref<string[]>([])
+const categoryPickerVisible = ref(false)
 
 const TITLE_MIN_LENGTH = 5
 const TITLE_MAX_LENGTH = 30
@@ -37,10 +39,27 @@ const categories = [
   { id: 10, name: '行业资讯' },
 ]
 
-const selectedCategory = computed(() => categories[categoryIndex.value] || categories[0])
+const categoryOptions = computed(() => categories.map(item => ({ label: item.name, value: item.id })))
+const selectedCategory = computed(() => categories[categoryIndex.value] || null)
 const isEditMode = computed(() => Boolean(postId.value))
 const pageTitle = computed(() => isEditMode.value ? '修改帖子' : '发布帖子')
 const submitButtonText = computed(() => isEditMode.value ? '保存修改' : '发布帖子')
+const titleLength = computed(() => title.value.trim().length)
+const contentLength = computed(() => content.value.trim().length)
+const canSubmit = computed(() => {
+  return titleLength.value >= TITLE_MIN_LENGTH
+    && titleLength.value <= TITLE_MAX_LENGTH
+    && contentLength.value >= CONTENT_MIN_LENGTH
+    && contentLength.value <= CONTENT_MAX_LENGTH
+    && Boolean(selectedCategory.value?.id)
+    && !submitting.value
+    && !uploading.value
+})
+
+function syncCategoryValue(index: number) {
+  const target = categories[index]
+  categoryValue.value = target ? [target.id] : []
+}
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error && error.message)
@@ -50,26 +69,33 @@ function getErrorMessage(error: unknown) {
 }
 
 function handleCategoryChange(event: any) {
-  const index = Number(event?.detail?.value || 0)
-  categoryIndex.value = Number.isNaN(index) ? 0 : index
+  const rawValue = event?.value
+  const nextCategoryId = Array.isArray(rawValue) ? Number(rawValue[0]) : Number(rawValue)
+  const idx = categories.findIndex(item => item.id === nextCategoryId)
+  categoryIndex.value = idx >= 0 ? idx : -1
+  syncCategoryValue(categoryIndex.value)
+  categoryPickerVisible.value = false
 }
 
 function syncCategoryIndexByDetail(detail: Record<string, any>) {
   const categoryId = Number(detail?.categoryId)
   if (!Number.isNaN(categoryId) && categoryId > 0) {
     const idx = categories.findIndex(item => item.id === categoryId)
-    categoryIndex.value = idx >= 0 ? idx : 0
+    categoryIndex.value = idx >= 0 ? idx : -1
+    syncCategoryValue(categoryIndex.value)
     return
   }
 
   const categoryName = String(detail?.categoryName || '')
   if (categoryName) {
     const idx = categories.findIndex(item => item.name === categoryName)
-    categoryIndex.value = idx >= 0 ? idx : 0
+    categoryIndex.value = idx >= 0 ? idx : -1
+    syncCategoryValue(categoryIndex.value)
     return
   }
 
-  categoryIndex.value = 0
+  categoryIndex.value = -1
+  syncCategoryValue(categoryIndex.value)
 }
 
 async function fetchPostDetail() {
@@ -85,7 +111,6 @@ async function fetchPostDetail() {
     syncCategoryIndexByDetail(detail as any)
   }
   catch (error) {
-    console.error('获取帖子详情失败', error)
     uni.showToast({
       title: getErrorMessage(error),
       icon: 'none',
@@ -139,10 +164,11 @@ async function handleSubmit() {
       categoryId: category.id,
       images: imageUrls.value,
     }
-    const response = isEditMode.value
-      ? await updatePost(postId.value, payload)
-      : await createPost(payload)
-    console.log(`${isEditMode.value ? '更新' : '发布'}帖子返回:`, response)
+
+    if (isEditMode.value)
+      await updatePost(postId.value, payload)
+    else
+      await createPost(payload)
 
     uni.showToast({
       title: isEditMode.value ? '修改成功' : '发布成功',
@@ -153,19 +179,14 @@ async function handleSubmit() {
       uni.setStorageSync(FORUM_NEED_REFRESH_KEY, Date.now())
       uni.setStorageSync(USER_POST_NEED_REFRESH_KEY, Date.now())
       if (isEditMode.value) {
-        uni.navigateBack({
-          delta: 1,
-        })
+        uni.navigateBack({ delta: 1 })
       }
       else {
-        uni.switchTab({
-          url: '/pages/forum/forum',
-        })
+        uni.switchTab({ url: '/pages/forum/forum' })
       }
     }, 400)
   }
   catch (error) {
-    console.error(`${isEditMode.value ? '更新' : '发布'}帖子失败`, error)
     uni.showToast({
       title: getErrorMessage(error),
       icon: 'none',
@@ -278,8 +299,7 @@ function handleChooseImages() {
           icon: 'success',
         })
       }
-      catch (error) {
-        console.error('上传帖子图片失败', error)
+      catch {
         uni.showToast({
           title: '上传失败，请稍后再试',
           icon: 'none',
@@ -304,70 +324,166 @@ onLoad((options) => {
 </script>
 
 <template>
-  <view class="flex flex-col gap-20rpx px-24rpx py-20rpx">
-    <view v-if="pageLoading" class="center flex flex-col gap-8rpx py-40rpx text-gray-500">
-      <wd-loading />
-      <wd-text text="加载中..." color="black" size="24rpx" />
-    </view>
-
-    <template v-else>
-      <wd-text text="离开当前页面后已编辑的内容不会保存" size="22rpx" color="red" />
-
-      <view class="flex flex-col gap-10rpx">
-        <wd-text text="帖子标题" size="24rpx" color="black" />
-        <wd-input v-model="title" clearable :maxlength="TITLE_MAX_LENGTH" placeholder="请输入标题（5-30字）" />
+  <view class="min-h-screen bg-[linear-gradient(180deg,#eaf2f8_0%,#f3f6f9_18%,#f3f6f9_100%)] pb-40rpx">
+    <view class="px-24rpx pt-20rpx">
+      <view v-if="pageLoading" class="flex flex-col gap-16rpx py-12rpx">
+        <view class="rd-24rpx bg-[linear-gradient(160deg,#dbe8f1_0%,#f8fbfd_42%,#e8f0f6_100%)] p-24rpx shadow-[0_8rpx_20rpx_rgba(33,84,118,0.08)]">
+          <view class="h-28rpx w-180rpx rd-full bg-[#d0e0eb]" />
+          <view class="mt-12rpx h-20rpx w-88% rd-full bg-[#e3edf4]" />
+          <view class="mt-8rpx h-20rpx w-66% rd-full bg-[#edf3f7]" />
+          <view class="grid grid-cols-3 mt-24rpx gap-12rpx">
+            <view v-for="item in 3" :key="item" class="h-120rpx rd-18rpx bg-white/70" />
+          </view>
+        </view>
+        <view class="rd-24rpx bg-white p-24rpx shadow-[0_8rpx_20rpx_rgba(33,84,118,0.08)]">
+          <view class="h-24rpx w-120rpx rd-full bg-[#dbe8f1]" />
+          <view class="mt-16rpx h-84rpx rd-16rpx bg-[#f2f6f9]" />
+          <view class="mt-16rpx h-280rpx rd-20rpx bg-[#f5f8fb]" />
+        </view>
       </view>
 
-      <view class="flex flex-col gap-10rpx">
-        <wd-text text="帖子内容" size="24rpx" color="black" />
-        <textarea
-          v-model="content"
-          class="box-border w-full"
-          style="min-height: 280rpx; border-radius: 16rpx; background: #f7f8fa; padding: 16rpx; font-size: 24rpx;"
-          placeholder="请输入内容（10-2000字）"
-          :maxlength="CONTENT_MAX_LENGTH"
-        />
-      </view>
+      <template v-else>
+        <view class="b-1rpx b-[#fecdd3] rd-20rpx b-solid bg-[#fff1f2] px-20rpx py-16rpx shadow-[0_6rpx_16rpx_rgba(190,24,93,0.08)]">
+          <view class="flex items-center gap-10rpx">
+            <view class="i-material-symbols-warning-outline-rounded size-30rpx color-[#be123c]" />
+            <wd-text text="离开当前页面后，未提交的编辑内容不会自动保存" size="22rpx" color="#be123c" />
+          </view>
+        </view>
 
-      <view class="flex flex-col gap-12rpx">
-        <wd-text text="帖子图片（最多9张）" size="24rpx" color="black" />
-        <view class="flex flex-wrap gap-12rpx">
-          <view
-            v-for="(imageUrl, index) in imageUrls"
-            :key="`${imageUrl}-${index}`"
-            class="relative h-200rpx w-200rpx overflow-hidden rd-12rpx bg-#f7f8fa"
-            @tap="handlePreviewImage(imageUrl)"
-          >
-            <image :src="imageUrl" mode="aspectFill" class="h-full w-full" />
-            <view class="absolute right-8rpx top-8rpx h-40rpx w-40rpx center rd-999rpx bg-black/45 text-24rpx text-white" @tap.stop="handleDeleteImage(index)">
-              ×
+        <view class="mt-18rpx flex flex-col gap-18rpx">
+          <view class="rd-24rpx bg-white p-24rpx shadow-[0_8rpx_20rpx_rgba(33,84,118,0.08)]">
+            <view class="flex flex-col">
+              <wd-text text="标题与分类" size="30rpx" color="#16364d" bold />
+              <wd-text text="先让大家一眼知道这条内容在说什么" size="22rpx" color="#6b7280" class="mt-6rpx" />
+            </view>
+
+            <view class="mt-18rpx flex flex-col gap-18rpx">
+              <view>
+                <view class="mb-10rpx flex items-center justify-between">
+                  <wd-text text="帖子标题" size="22rpx" color="#4b5563" />
+                  <wd-text :text="`${titleLength}/${TITLE_MAX_LENGTH}`" size="22rpx" :color="titleLength < TITLE_MIN_LENGTH ? '#d97706' : '#64748b'" />
+                </view>
+                <view class="h-64rpx flex items-center b-1rpx b-[#dbe7f0] rd-18rpx b-solid bg-[#f6f9fb] px-18rpx">
+                  <wd-input v-model="title" clearable :maxlength="TITLE_MAX_LENGTH" placeholder="请输入标题（5-30字）" no-border custom-class="!h-full !bg-transparent flex-1 flex items-center" />
+                </view>
+              </view>
+
+              <view>
+                <wd-text text="帖子分类" size="22rpx" color="#4b5563" class="mb-10rpx" />
+                <wd-picker
+                  v-model="categoryValue"
+                  v-model:visible="categoryPickerVisible"
+                  :columns="categoryOptions"
+                  title="选择帖子分类"
+                  value-key="value"
+                  label-key="label"
+                  class="mt-10rpx"
+                  @confirm="handleCategoryChange"
+                >
+                  <view class="h-64rpx flex items-center justify-between b-1rpx b-[#dbe7f0] rd-18rpx b-solid bg-[#f6f9fb] px-18rpx">
+                    <view class="flex items-center gap-10rpx">
+                      <view class="i-material-symbols-category-outline-rounded size-32rpx color-[#215476]" />
+                      <wd-text :text="selectedCategory?.name || '请选择帖子分类'" size="26rpx" color="#16364d" />
+                    </view>
+                    <view class="i-material-symbols-keyboard-arrow-down-rounded size-38rpx color-[#64748b]" />
+                  </view>
+                </wd-picker>
+              </view>
             </view>
           </view>
 
-          <view
-            v-if="imageUrls.length < POST_IMAGE_MAX_COUNT"
-            class="h-200rpx w-200rpx center b-2rpx b-#d0d5dd rd-12rpx b-dashed bg-#fafbfc text-50rpx text-#98a2b3"
-            @tap="handleChooseImages"
-          >
-            +
+          <view class="rd-24rpx bg-white p-24rpx shadow-[0_8rpx_20rpx_rgba(33,84,118,0.08)]">
+            <view class="flex items-center justify-between gap-12rpx">
+              <view class="flex flex-col">
+                <wd-text text="正文内容" size="30rpx" color="#16364d" bold />
+                <wd-text text="记录细节、背景和你真正想分享的重点" size="22rpx" color="#6b7280" class="mt-6rpx" />
+              </view>
+              <wd-text :text="`${contentLength}/${CONTENT_MAX_LENGTH}`" size="22rpx" :color="contentLength < CONTENT_MIN_LENGTH ? '#d97706' : '#64748b'" />
+            </view>
+
+            <view class="mt-18rpx b-1rpx b-[#dbe7f0] rd-20rpx b-solid bg-[linear-gradient(180deg,#f8fbfd_0%,#f4f8fb_100%)] p-16rpx">
+              <textarea
+                v-model="content"
+                :maxlength="CONTENT_MAX_LENGTH"
+                placeholder="请输入内容（10-2000字）"
+                auto-height
+                :show-confirm-bar="false"
+                :disable-default-padding="true"
+                class="content-textarea max-h-720rpx min-h-360rpx w-full overflow-y-auto bg-transparent text-26rpx color-[#1f2937] leading-[1.8]"
+                placeholder-class="color-[#9ca3af]"
+              />
+            </view>
+          </view>
+
+          <view class="rd-24rpx bg-white p-24rpx shadow-[0_8rpx_20rpx_rgba(33,84,118,0.08)]">
+            <view class="flex items-center justify-between gap-12rpx">
+              <view class="flex flex-col">
+                <wd-text text="配图" size="30rpx" color="#16364d" bold />
+                <wd-text text="最多上传 9 张图片，让内容更有现场感" size="22rpx" color="#6b7280" class="mt-6rpx" />
+              </view>
+              <wd-text :text="`${imageUrls.length}/${POST_IMAGE_MAX_COUNT}`" size="20rpx" color="#215476" class="rd-full bg-[#eef4f8] px-16rpx py-8rpx" />
+            </view>
+
+            <view class="grid grid-cols-3 mt-18rpx justify-items-center gap-x-14rpx gap-y-14rpx">
+              <view
+                v-for="(imageUrl, index) in imageUrls"
+                :key="`${imageUrl}-${index}`"
+                class="group relative h-200rpx w-200rpx overflow-hidden rd-18rpx bg-[#eff4f8] shadow-[0_6rpx_16rpx_rgba(33,84,118,0.08)]"
+                @tap="handlePreviewImage(imageUrl)"
+              >
+                <image :src="imageUrl" mode="aspectFill" class="h-full w-full" />
+                <view class="absolute inset-x-0 bottom-0 h-56rpx bg-[linear-gradient(180deg,transparent_0%,rgba(15,23,42,0.55)_100%)]" />
+                <view class="absolute right-10rpx top-10rpx h-44rpx w-44rpx flex items-center justify-center rd-full bg-black/45" @tap.stop="handleDeleteImage(index)">
+                  <wd-text text="×" size="28rpx" color="white" />
+                </view>
+              </view>
+
+              <view
+                v-if="imageUrls.length < POST_IMAGE_MAX_COUNT"
+                class="h-200rpx w-200rpx flex flex-col items-center justify-center gap-10rpx b-2rpx b-[#bfd1df] rd-18rpx b-dashed bg-[linear-gradient(180deg,#f8fbfd_0%,#f0f6fa_100%)] color-[#6b7f8f]"
+                @tap="handleChooseImages"
+              >
+                <view class="i-material-symbols-add-photo-alternate-outline-rounded size-52rpx color-[#215476]" />
+                <wd-text text="添加图片" size="22rpx" color="#6b7f8f" />
+              </view>
+            </view>
+
+            <wd-text v-if="uploading" text="图片上传中，请稍候..." size="22rpx" color="#6b7280" class="mt-14rpx" />
           </view>
         </view>
-        <wd-text v-if="uploading" text="图片上传中，请稍候..." size="22rpx" color="#999999" />
-      </view>
 
-      <view class="flex flex-col gap-10rpx">
-        <wd-text text="帖子分类" size="24rpx" color="black" />
-        <picker :range="categories" range-key="name" :value="categoryIndex" @change="handleCategoryChange">
-          <view class="h-84rpx flex items-center justify-between rd-16rpx bg-#f7f8fa px-16rpx text-24rpx text-black">
-            <text>{{ selectedCategory.name }}</text>
-            <view class="i-material-symbols-keyboard-arrow-down-rounded size-36rpx bg-#666" />
+        <view class="mt-20rpx rd-24rpx bg-[linear-gradient(160deg,#183a53_0%,#215476_42%,#2f6c95_100%)] p-24rpx shadow-[0_14rpx_28rpx_rgba(33,84,118,0.2)]">
+          <view class="flex items-center justify-between gap-16rpx">
+            <view class="min-w-0 flex flex-1 flex-col">
+              <wd-text text="准备好发布了吗？" size="28rpx" color="white" bold />
+              <wd-text text="帖子提交后需要先经过审核，审核通过后才会展示在社区中" size="22rpx" color="rgba(255,255,255,0.72)" class="mt-8rpx leading-[1.7]" />
+            </view>
+            <wd-button
+              type="primary"
+              :disabled="!canSubmit"
+              :loading="submitting"
+              class="!h-84rpx !min-w-180rpx !rd-full !b-none !bg-white !px-28rpx disabled:!bg-white/55"
+              @click="handleSubmit"
+            >
+              <wd-text :text="submitButtonText" size="24rpx" color="#215476" />
+            </wd-button>
           </view>
-        </picker>
-      </view>
+        </view>
 
-      <wd-button type="primary" :loading="submitting" class="mt-20rpx" style="background: #215476; border-color: #215476;" @click="handleSubmit">
-        {{ submitButtonText }}
-      </wd-button>
-    </template>
+        <view class="h-32rpx" />
+      </template>
+    </view>
   </view>
 </template>
+
+<style scoped>
+.content-textarea {
+  scrollbar-width: none;
+}
+
+.content-textarea::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+</style>

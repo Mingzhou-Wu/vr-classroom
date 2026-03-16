@@ -255,7 +255,7 @@ function handleMenuTap(key: string) {
     <view class="h-400rpx" />
 
     <view v-if="showSkeleton" class="flex flex-col gap-24rpx rd-t-32rpx bg-[#f3f6f9] px-24rpx py-24rpx">
-      <view class="rd-20rpx bg-[#edf4f8] px-24rpx py-20rpx shadow-[0_6rpx_14rpx_rgba(33,84,118,0.1)]">
+      <view class="rd-20rpx bg-[linear-gradient(160deg,#1a3f5a_0%,#215476_46%,#2f6f97_100%)] px-24rpx py-20rpx shadow-[0_12rpx_28rpx_rgba(33,84,118,0.22)]">
         <view class="flex items-center gap-24rpx">
           <view class="h-128rpx w-128rpx rd-full bg-[#dbe8f1]" />
 
@@ -292,18 +292,18 @@ function handleMenuTap(key: string) {
     </view>
 
     <view v-else class="flex flex-col gap-24rpx rd-t-32rpx bg-[#f3f6f9] px-24rpx py-24rpx">
-      <view class="rd-20rpx bg-[#edf4f8] px-24rpx py-20rpx shadow-[0_6rpx_14rpx_rgba(33,84,118,0.1)]">
+      <view class="rd-20rpx bg-[linear-gradient(160deg,#1a3f5a_0%,#215476_46%,#2f6f97_100%)] px-24rpx py-20rpx shadow-[0_12rpx_28rpx_rgba(33,84,118,0.22)]">
         <view class="flex items-center gap-24rpx">
           <wd-img :src="user.avatar" class="h-128rpx w-128rpx b-4rpx b-white rd-full b-solid" mode="aspectFill" />
 
           <view class="flex flex-1 items-center justify-between gap-16rpx">
             <view class="min-w-0 flex flex-col justify-center gap-10rpx">
-              <wd-text :text="user.name" size="36rpx" color="#215476" />
-              <wd-text :text="user.collegeName || '未设置学院'" size="20rpx" color="#4b5563" />
+              <wd-text :text="user.name" size="36rpx" color="white" />
+              <wd-text :text="user.collegeName || '未设置学院'" size="20rpx" color="rgba(255,255,255,0.76)" />
             </view>
 
-            <wd-button class="!h-64rpx !rd-full !bg-[#215476] !px-24rpx" size="small" :loading="loginLoading" @tap="handleProfileAction">
-              <wd-text :text="profileActionText" size="24rpx" color="white" />
+            <wd-button class="!h-64rpx !rd-full !px-24rpx" custom-style="background: #ffffff; border-color: rgba(255,255,255,0.36); color: #215476; box-shadow: 0 8rpx 18rpx rgba(8,37,58,0.18);" size="small" :loading="loginLoading" @tap="handleProfileAction">
+              <wd-text :text="profileActionText" size="24rpx" color="#215476" />
             </wd-button>
           </view>
         </view>
