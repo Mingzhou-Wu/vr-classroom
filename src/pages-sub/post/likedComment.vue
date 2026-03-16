@@ -16,6 +16,7 @@ interface ILikedCommentCard {
   isLiked?: boolean
   relatedPostId?: string
   relatedPostTitle?: string
+  relatedPostStatus?: number
 }
 
 const commentList = ref<ILikedCommentCard[]>([])
@@ -38,6 +39,22 @@ onPageScroll((e) => {
   lastPageScrollSyncAt.value = now
 })
 
+function isRelatedPostUnavailable(status?: number) {
+  return status === -1 || status === 0 || status === 2
+}
+
+function getRelatedPostStatusText(status?: number) {
+  if (isRelatedPostUnavailable(status))
+    return '暂不可访问'
+  return ''
+}
+
+function getRelatedPostUnavailableToast(status?: number) {
+  if (isRelatedPostUnavailable(status))
+    return '关联帖子当前状态下暂不可操作'
+  return '当前不可操作'
+}
+
 function normalizeRecord(record: IUserCommentRecord): ILikedCommentCard {
   return {
     id: String(record.id || ''),
@@ -47,6 +64,7 @@ function normalizeRecord(record: IUserCommentRecord): ILikedCommentCard {
     isLiked: Boolean(record.isLiked),
     relatedPostId: String(record.relatedPost?.id || ''),
     relatedPostTitle: record.relatedPost?.title || '未知帖子',
+    relatedPostStatus: record.relatedPost?.status,
   }
 }
 
@@ -159,9 +177,17 @@ onReachBottom(() => {
   fetchCommentListByPage(currentPage.value + 1, true)
 })
 
-function goPostPage(postId?: string) {
+function goPostPage(postId?: string, relatedPostStatus?: number) {
   if (!postId)
     return
+
+  if (isRelatedPostUnavailable(relatedPostStatus)) {
+    uni.showToast({
+      title: getRelatedPostUnavailableToast(relatedPostStatus),
+      icon: 'none',
+    })
+    return
+  }
 
   uni.navigateTo({
     url: `/pages-sub/post/post?id=${postId}`,
@@ -186,6 +212,14 @@ async function toggleCommentLike(comment: ILikedCommentCard) {
   const targetCommentId = String(comment.id || '')
   if (!targetCommentId || likingCommentIds.value.has(targetCommentId))
     return
+
+  if (isRelatedPostUnavailable(comment.relatedPostStatus)) {
+    uni.showToast({
+      title: getRelatedPostUnavailableToast(comment.relatedPostStatus),
+      icon: 'none',
+    })
+    return
+  }
 
   const likedBefore = Boolean(comment.isLiked)
   const previousLikeCount = Number(comment.likeCount || 0)
@@ -246,6 +280,9 @@ async function toggleCommentLike(comment: ILikedCommentCard) {
         </view>
         <wd-text text="还没有点赞过评论" size="30rpx" color="#1f2937" bold />
         <wd-text text="去社区逛逛，把你认可的观点收藏到这里。" size="24rpx" color="#64748b" :lines="2" />
+        <view class="mt-24rpx inline-flex rd-full bg-[#215476] px-28rpx py-16rpx" @tap="handleRefresh">
+          <wd-text text="重新加载" size="24rpx" color="#ffffff" />
+        </view>
       </view>
     </view>
 
@@ -254,14 +291,19 @@ async function toggleCommentLike(comment: ILikedCommentCard) {
         v-for="comment in commentList"
         :key="comment.id"
         class="mb-16rpx rd-20rpx bg-white p-20rpx"
+        :class="isRelatedPostUnavailable(comment.relatedPostStatus) ? 'opacity-88' : ''"
         style="box-shadow: 0 6rpx 14rpx rgba(33,84,118,0.08)"
-        @tap="goPostPage(comment.relatedPostId)"
+        @tap="goPostPage(comment.relatedPostId, comment.relatedPostStatus)"
       >
         <view class="flex flex-col gap-14rpx">
           <view class="flex items-center justify-between gap-12rpx">
             <wd-text :text="formatPublishMeta(comment.date)" size="22rpx" color="#6b7280" />
 
-            <view class="ml-auto center flex shrink-0 gap-8rpx rd-full bg-[#f8fbfd] px-16rpx py-10rpx" @tap.stop="toggleCommentLike(comment)">
+            <view
+              class="ml-auto center flex shrink-0 gap-8rpx rd-full px-16rpx py-10rpx"
+              :class="isRelatedPostUnavailable(comment.relatedPostStatus) ? 'bg-[#eef2f6]' : 'bg-[#f8fbfd]'"
+              @tap.stop="toggleCommentLike(comment)"
+            >
               <view v-if="comment.isLiked" class="i-majesticons:thumb-up size-34rpx bg-[#ff3040]" />
               <view v-else class="i-majesticons-thumb-up-line size-34rpx bg-[#64748b]" />
               <wd-text :text="comment.likeCount" size="22rpx" :color="comment.isLiked ? '#ff3040' : '#475569'" />
@@ -273,14 +315,18 @@ async function toggleCommentLike(comment: ILikedCommentCard) {
           </view>
 
           <view
-            class="flex items-center gap-16rpx rd-16rpx bg-[linear-gradient(135deg,#f8fbfd_0%,#edf4f8_100%)] px-18rpx py-16rpx"
-            @tap.stop="goPostPage(comment.relatedPostId)"
+            class="flex items-center gap-16rpx rd-16rpx px-18rpx py-16rpx"
+            :class="isRelatedPostUnavailable(comment.relatedPostStatus) ? 'bg-[linear-gradient(135deg,#f8fafc_0%,#eef2f6_100%)]' : 'bg-[linear-gradient(135deg,#f8fbfd_0%,#edf4f8_100%)]'"
+            @tap.stop="goPostPage(comment.relatedPostId, comment.relatedPostStatus)"
           >
             <view class="h-52rpx w-52rpx flex items-center justify-center rd-14rpx bg-white shadow-[0_6rpx_12rpx_rgba(33,84,118,0.08)]">
               <view class="i-material-symbols-article-outline-rounded size-30rpx color-[#215476]" />
             </view>
             <view class="min-w-0 flex-1">
-              <wd-text text="评论所在帖子" size="20rpx" color="#64748b" />
+              <view class="flex items-center gap-10rpx">
+                <wd-text text="评论所在帖子" size="20rpx" color="#64748b" />
+                <wd-text v-if="isRelatedPostUnavailable(comment.relatedPostStatus)" :text="getRelatedPostStatusText(comment.relatedPostStatus)" size="20rpx" color="#c2410c" class="rd-full bg-[#fff7ed] px-12rpx py-4rpx" />
+              </view>
               <wd-text :text="comment.relatedPostTitle || '未知帖子'" size="24rpx" color="#16364d" :lines="2" bold />
             </view>
           </view>
