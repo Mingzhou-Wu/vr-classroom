@@ -2,7 +2,8 @@ import type { IAuthLoginRes, ICaptcha, IDoubleTokenRes, IUpdateInfo, IUpdatePass
 import { http } from '@/http/http'
 
 export interface IWxPhoneLoginReq {
-  phone: string
+  phone?: string
+  code?: string
 }
 
 export interface IWxPhoneLoginUser {
@@ -18,6 +19,20 @@ export interface IWxPhoneLoginUser {
 export interface IWxPhoneLoginRes {
   user: IWxPhoneLoginUser
   token: string
+}
+
+export interface IWxMiniLoginReq {
+  loginCode: string
+}
+
+export interface IWxMiniLoginRes {
+  needBindPhone: boolean
+  user: IWxPhoneLoginUser | null
+  token: string
+}
+
+export interface IBindPhoneReq {
+  phoneCode: string
 }
 
 /**
@@ -56,7 +71,7 @@ export function refreshToken(refreshToken: string) {
  * 获取用户信息
  */
 export function getUserInfo() {
-  return http.get<IUserInfoRes>('/user/info')
+  return http.get<IUserInfoRes>('/api/users/profile')
 }
 
 /**
@@ -104,9 +119,24 @@ export function wxLogin(data: { code: string }) {
 }
 
 /**
- * 微信手机号登录
- * @param data 手机号登录参数
+ * 小程序快捷登录
+ * @param data 微信登录参数，包含loginCode
+ */
+export function wxMiniLogin(data: IWxMiniLoginReq) {
+  return http.post<IWxMiniLoginRes>('/api/users/login', data)
+}
+
+/**
+ * 兼容旧的手机号登录导出，供 store 继续使用
  */
 export function wxPhoneLogin(data: IWxPhoneLoginReq) {
   return http.post<IWxPhoneLoginRes>('/api/users/login/phone', data)
+}
+
+/**
+ * 绑定微信手机号
+ * @param data 手机号授权参数
+ */
+export function bindPhone(data: IBindPhoneReq) {
+  return http.post<void>('/api/users/bind-phone', data)
 }

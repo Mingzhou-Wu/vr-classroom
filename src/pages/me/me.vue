@@ -1,7 +1,9 @@
 <script lang="ts" setup>
+import type { IWxPhoneLoginUser } from '@/api/login'
+import type { IAuthLoginRes } from '@/api/types/login'
+import { bindPhone, wxMiniLogin } from '@/api/login'
 import { useTokenStore, useUserStore } from '@/store'
 import { defaultUserInfo } from '@/store/user'
-import { getEnvBaseUrl } from '@/utils'
 
 definePage({
   style: {
@@ -11,8 +13,10 @@ definePage({
 
 const tokenStore = useTokenStore()
 const userStore = useUserStore()
-const apiBaseUrl = getEnvBaseUrl()
 const showSkeleton = ref(true)
+const loginLoading = ref(false)
+const bindPhoneLoading = ref(false)
+const needBindPhone = ref(false)
 let skeletonTimer: ReturnType<typeof setTimeout> | null = null
 
 const isLogin = computed(() => tokenStore.updateNowTime().hasLogin)
@@ -25,24 +29,52 @@ const user = computed(() => {
     avatar: isLogin.value ? (loginUser.avatar || defaultUserInfo.avatar) : defaultUserInfo.avatar,
   }
 })
+const needsVerify = computed(() => isLogin.value && Number(user.value.verifyStatus) === 0)
+const profileActionText = computed(() => {
+  if (!isLogin.value)
+    return '去登录'
+  if (needsVerify.value)
+    return '去认证'
+  return '个人资料'
+})
+
+interface WechatPhoneEvent {
+  detail?: {
+    code?: string
+    errMsg?: string
+  }
+}
+
+function applyToken(token: string) {
+  tokenStore.setTokenInfo({
+    token,
+    expiresIn: 30 * 24 * 60 * 60,
+  } as IAuthLoginRes)
+}
+
+function applyLoginUser(userInfo: IWxPhoneLoginUser | null) {
+  if (userInfo) {
+    userStore.setUserInfo(userInfo as any)
+  }
+}
 
 async function handleLogin() {
-  console.log('[me] 点击去登录按钮')
-  if (isLogin.value) {
-    console.log('[me] 当前已登录，跳过登录流程')
+  if (isLogin.value || loginLoading.value || needBindPhone.value) {
     return
   }
 
+  loginLoading.value = true
+
   try {
     const loginRes = await new Promise<{ code?: string }>((resolve, reject) => {
-      wx.login({
+      uni.login({
+        provider: 'weixin',
         success: resolve,
         fail: reject,
       } as any)
     })
 
     const code = loginRes?.code
-    console.log('[me] wx.login 返回 code:', code)
     if (!code) {
       uni.showToast({
         title: '获取登录凭证失败',
@@ -51,35 +83,90 @@ async function handleLogin() {
       return
     }
 
-    const loginUrl = `${apiBaseUrl}/api/users/login`
-    console.log('[me] 准备请求登录接口:', loginUrl)
+    const response = await wxMiniLogin({
+      loginCode: code,
+    })
 
-    // const response = await new Promise<any>((resolve, reject) => {
-    //   uni.request({
-    //     url: loginUrl,
-    //     method: 'POST',
-    //     data: {
-    //       loginCode: code,
-    //     },
-    //     success: (res) => {
-    //       console.log('[me] 登录接口原始响应:', res)
-    //       resolve((res.data as any)?.data ?? res.data)
-    //     },
-    //     fail: (err) => {
-    //       console.log('[me] 登录接口请求失败:', err)
-    //       reject(err)
-    //     },
-    //   })
-    // })
-    // console.log('用户登录返回:', response)
+    applyToken(response.token)
+
+    if (response.needBindPhone) {
+      needBindPhone.value = true
+      userStore.clearUserInfo()
+      return
+    }
+
+    needBindPhone.value = false
+    applyLoginUser(response.user)
+    if (!response.user) {
+      await userStore.fetchUserInfo()
+    }
+    uni.showToast({
+      title: '登录成功',
+      icon: 'success',
+    })
   }
-  catch (error) {
-    console.log('[me] 登录 catch:', error)
-    console.error('登录失败:', error)
+  catch {
     uni.showToast({
       title: '登录失败，请重试',
       icon: 'none',
     })
+  }
+  finally {
+    loginLoading.value = false
+  }
+}
+
+async function handleGetPhoneNumber(event: WechatPhoneEvent) {
+  if (!needBindPhone.value || bindPhoneLoading.value) {
+    return
+  }
+
+  const phoneCode = event.detail?.code
+  const errMsg = event.detail?.errMsg || ''
+
+  if (!phoneCode) {
+    uni.showToast({
+      title: errMsg && !errMsg.includes(':ok') ? '需要授权手机号才能完成登录' : '获取手机号失败，请重试',
+      icon: 'none',
+    })
+    return
+  }
+
+  bindPhoneLoading.value = true
+
+  try {
+    await bindPhone({ phoneCode })
+    await userStore.fetchUserInfo()
+    needBindPhone.value = false
+
+    uni.showToast({
+      title: '登录成功',
+      icon: 'success',
+    })
+  }
+  catch {
+    uni.showToast({
+      title: '手机号授权失败，请重试',
+      icon: 'none',
+    })
+  }
+  finally {
+    bindPhoneLoading.value = false
+  }
+}
+
+function handleVerify() {
+}
+
+function handleProfileAction() {
+  if (!isLogin.value) {
+    handleLogin()
+    return
+  }
+
+  if (needsVerify.value) {
+    handleVerify()
+    return
   }
 }
 
@@ -140,6 +227,14 @@ const menuList = [
 ]
 
 function handleMenuTap(key: string) {
+  if (needBindPhone.value) {
+    uni.showToast({
+      title: '请先完成手机号授权',
+      icon: 'none',
+    })
+    return
+  }
+
   if (key === 'order')
     return goUserOrderPage()
   if (key === 'post')
@@ -154,13 +249,13 @@ function handleMenuTap(key: string) {
 </script>
 
 <template>
-  <view class="bg-transparent">
+  <view class="min-h-screen bg-transparent">
     <wd-img src="http://10.86.136.242:9000/images/me_banner.png" class="z--1 h-420rpx w-full !fixed" mode="aspectFill" />
 
     <view class="h-400rpx" />
 
     <view v-if="showSkeleton" class="flex flex-col gap-24rpx rd-t-32rpx bg-[#f3f6f9] px-24rpx py-24rpx">
-      <view class="rd-20rpx bg-[#edf4f8] px-24rpx py-20rpx" style="box-shadow: 0 6rpx 14rpx rgba(33,84,118,0.1)">
+      <view class="rd-20rpx bg-[#edf4f8] px-24rpx py-20rpx shadow-[0_6rpx_14rpx_rgba(33,84,118,0.1)]">
         <view class="flex items-center gap-24rpx">
           <view class="h-128rpx w-128rpx rd-full bg-[#dbe8f1]" />
 
@@ -168,7 +263,6 @@ function handleMenuTap(key: string) {
             <view class="min-w-0 flex flex-col justify-center gap-12rpx">
               <view class="h-30rpx w-180rpx rd-full bg-[#d5e4ee]" />
               <view class="h-20rpx w-140rpx rd-full bg-[#e5eef5]" />
-              <view class="h-56rpx w-120rpx rd-full bg-[#e7eff5]" />
             </view>
 
             <view class="h-64rpx w-140rpx rd-full bg-[#d7e8f2]" />
@@ -176,7 +270,7 @@ function handleMenuTap(key: string) {
         </view>
       </view>
 
-      <view class="rd-20rpx bg-white px-24rpx py-10rpx" style="box-shadow: 0 6rpx 14rpx rgba(33,84,118,0.1)">
+      <view class="rd-20rpx bg-white px-24rpx py-10rpx shadow-[0_6rpx_14rpx_rgba(33,84,118,0.1)]">
         <view class="h-72rpx flex items-center justify-between">
           <view class="h-28rpx w-120rpx rd-full bg-[#d5e4ee]" />
           <view class="h-20rpx w-72rpx rd-full bg-[#e5eef5]" />
@@ -198,7 +292,7 @@ function handleMenuTap(key: string) {
     </view>
 
     <view v-else class="flex flex-col gap-24rpx rd-t-32rpx bg-[#f3f6f9] px-24rpx py-24rpx">
-      <view class="rd-20rpx bg-[#edf4f8] px-24rpx py-20rpx" style="box-shadow: 0 6rpx 14rpx rgba(33,84,118,0.1)">
+      <view class="rd-20rpx bg-[#edf4f8] px-24rpx py-20rpx shadow-[0_6rpx_14rpx_rgba(33,84,118,0.1)]">
         <view class="flex items-center gap-24rpx">
           <wd-img :src="user.avatar" class="h-128rpx w-128rpx b-4rpx b-white rd-full b-solid" mode="aspectFill" />
 
@@ -206,31 +300,16 @@ function handleMenuTap(key: string) {
             <view class="min-w-0 flex flex-col justify-center gap-10rpx">
               <wd-text :text="user.name" size="36rpx" color="#215476" />
               <wd-text :text="user.collegeName || '未设置学院'" size="20rpx" color="#4b5563" />
-
-              <wd-button
-                v-if="!isLogin"
-                class="!h-56rpx !b-[#215476] !rd-full !px-20rpx"
-                size="small"
-                plain
-                type="info"
-                @tap="handleLogin"
-              >
-                <wd-text text="去登录" size="22rpx" color="#215476" />
-              </wd-button>
-
-              <view v-else class="h-56rpx w-max flex items-center rd-full bg-[#e7eff5] px-18rpx">
-                <wd-text text="已登录" size="22rpx" color="#215476" />
-              </view>
             </view>
 
-            <wd-button class="!h-64rpx !rd-full !bg-[#215476] !px-24rpx" size="small">
-              <wd-text text="个人资料" size="24rpx" color="white" />
+            <wd-button class="!h-64rpx !rd-full !bg-[#215476] !px-24rpx" size="small" :loading="loginLoading" @tap="handleProfileAction">
+              <wd-text :text="profileActionText" size="24rpx" color="white" />
             </wd-button>
           </view>
         </view>
       </view>
 
-      <view class="rd-20rpx bg-white px-24rpx py-10rpx" style="box-shadow: 0 6rpx 14rpx rgba(33,84,118,0.1)">
+      <view class="rd-20rpx bg-white px-24rpx py-10rpx shadow-[0_6rpx_14rpx_rgba(33,84,118,0.1)]">
         <view class="h-72rpx flex items-center justify-between">
           <wd-text text="我的服务" size="30rpx" color="#215476" />
           <wd-text text="共5项" size="20rpx" color="#6b7280" />
@@ -251,8 +330,32 @@ function handleMenuTap(key: string) {
         </view>
       </view>
     </view>
+
+    <wd-popup
+      v-model="needBindPhone"
+      position="center"
+      :close-on-click-modal="false"
+      :show-close-icon="false"
+      custom-style="border-radius: 28rpx; overflow: hidden; background: transparent;"
+    >
+      <view class="max-w-[calc(100vw-64rpx)] w-620rpx overflow-hidden rd-28rpx bg-[linear-gradient(180deg,#f8fbfd_0%,#edf4f8_100%)] p-32rpx shadow-[0_18rpx_40rpx_rgba(33,84,118,0.18)]">
+        <view class="text-34rpx color-[#16364d] font-600 leading-[1.4]">
+          完成登录还差一步
+        </view>
+        <view class="mt-16rpx text-24rpx color-[#4b5563] leading-[1.7]">
+          当前账号必须先授权微信手机号，授权成功后才会进入个人中心。
+        </view>
+        <button
+          class="mt-32rpx h-84rpx w-full rd-full border-none bg-[#215476] text-28rpx color-white font-600 line-height-[84rpx]"
+          open-type="getPhoneNumber"
+          @getphonenumber="handleGetPhoneNumber"
+        >
+          {{ bindPhoneLoading ? '授权中...' : '授权手机号并完成登录' }}
+        </button>
+        <view class="mt-18rpx text-center text-22rpx color-[#6b7280] leading-[1.6]">
+          未完成授权前，本页其他操作将暂时不可用。
+        </view>
+      </view>
+    </wd-popup>
   </view>
 </template>
-
-
-
