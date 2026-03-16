@@ -17,6 +17,12 @@ const submitting = ref(false)
 const uploading = ref(false)
 const imageUrls = ref<string[]>([])
 const categoryPickerVisible = ref(false)
+const initialFormSnapshot = ref({
+  title: '',
+  content: '',
+  categoryId: 0,
+  images: [] as string[],
+})
 
 const TITLE_MIN_LENGTH = 5
 const TITLE_MAX_LENGTH = 30
@@ -43,15 +49,25 @@ const categoryOptions = computed(() => categories.map(item => ({ label: item.nam
 const selectedCategory = computed(() => categories[categoryIndex.value] || null)
 const isEditMode = computed(() => Boolean(postId.value))
 const pageTitle = computed(() => isEditMode.value ? '修改帖子' : '发布帖子')
-const submitButtonText = computed(() => isEditMode.value ? '保存修改' : '发布帖子')
+const submitButtonText = computed(() => isEditMode.value ? '提交修改' : '发布帖子')
 const titleLength = computed(() => title.value.trim().length)
 const contentLength = computed(() => content.value.trim().length)
+const hasChanges = computed(() => {
+  if (!isEditMode.value)
+    return true
+
+  return title.value.trim() !== initialFormSnapshot.value.title
+    || content.value.trim() !== initialFormSnapshot.value.content
+    || Number(selectedCategory.value?.id || 0) !== initialFormSnapshot.value.categoryId
+    || JSON.stringify(imageUrls.value) !== JSON.stringify(initialFormSnapshot.value.images)
+})
 const canSubmit = computed(() => {
   return titleLength.value >= TITLE_MIN_LENGTH
     && titleLength.value <= TITLE_MAX_LENGTH
     && contentLength.value >= CONTENT_MIN_LENGTH
     && contentLength.value <= CONTENT_MAX_LENGTH
     && Boolean(selectedCategory.value?.id)
+    && hasChanges.value
     && !submitting.value
     && !uploading.value
 })
@@ -109,6 +125,12 @@ async function fetchPostDetail() {
     content.value = String(detail?.content || detail?.summary || '')
     imageUrls.value = Array.isArray(detail?.images) ? detail.images.filter(Boolean) : []
     syncCategoryIndexByDetail(detail as any)
+    initialFormSnapshot.value = {
+      title: title.value.trim(),
+      content: content.value.trim(),
+      categoryId: Number(detail?.categoryId || selectedCategory.value?.id || 0),
+      images: [...imageUrls.value],
+    }
   }
   catch (error) {
     uni.showToast({
@@ -156,6 +178,11 @@ async function handleSubmit() {
     return
   }
 
+  if (isEditMode.value && !hasChanges.value) {
+    uni.showToast({ title: '内容未发生变化', icon: 'none' })
+    return
+  }
+
   submitting.value = true
   try {
     const payload = {
@@ -171,7 +198,7 @@ async function handleSubmit() {
       await createPost(payload)
 
     uni.showToast({
-      title: isEditMode.value ? '修改成功' : '发布成功',
+      title: isEditMode.value ? '修改已提交' : '发布已提交',
       icon: 'success',
     })
 

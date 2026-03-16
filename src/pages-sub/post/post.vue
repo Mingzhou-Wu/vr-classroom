@@ -26,6 +26,7 @@ const lastPageScrollSyncAt = ref(0)
 const keyboardHeight = ref(0)
 const keyboardDuration = ref(0)
 const confirmPopupVisible = ref(false)
+const postActionVisible = ref(false)
 const deleting = ref(false)
 const togglingLike = ref(false)
 const togglingCommentLikeIds = ref<Set<string>>(new Set())
@@ -81,16 +82,10 @@ const commentBarStyle = computed(() => {
 })
 
 const skeletonCommentList = Array.from({ length: 3 }, (_, index) => index)
-
-function formatDateForLocalComment(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  const hour = String(date.getHours()).padStart(2, '0')
-  const minute = String(date.getMinutes()).padStart(2, '0')
-  const second = String(date.getSeconds()).padStart(2, '0')
-  return `${year}-${month}-${day} ${hour}:${minute}:${second}`
-}
+const postActionList = [
+  { name: '修改帖子', key: 'edit', color: '#215476' },
+  { name: '删除帖子', key: 'delete', color: '#d03050' },
+]
 
 function handleInputKeyboardHeightChange(res: { height?: number, duration?: number }) {
   keyboardHeight.value = Math.max(Number(res?.height || 0), 0)
@@ -163,13 +158,6 @@ function handlePreviewPostImages(currentUrl: string) {
   })
 }
 
-function getCurrentUserDisplayName() {
-  const currentUser = userStore.userInfo
-  const candidates = [currentUser.name, currentUser.nickname, currentUser.username]
-  const displayName = candidates.find(item => item && item !== '未登录')
-  return displayName || '我'
-}
-
 const commentLoadMoreState = computed(() => {
   if (commentsLoadingMore.value)
     return 'loading'
@@ -206,46 +194,16 @@ async function handlePublishComment() {
 
   publishing.value = true
   try {
-    const response = await createComment({
+    await createComment({
       content: value,
       postId: normalizedPostId,
     })
-    console.log('发布评论返回:', response)
 
+    commentText.value = ''
     uni.showToast({
-      title: '发布成功',
+      title: '评论已提交',
       icon: 'success',
     })
-
-    if (post.value) {
-      post.value = {
-        ...post.value,
-        commentCount: Number(post.value.commentCount || 0) + 1,
-      }
-    }
-
-    const currentUser = userStore.userInfo
-    const displayName = getCurrentUserDisplayName()
-    const responseData = (response || {}) as Record<string, any>
-    const createdComment = {
-      id: String(responseData.id || `local-${Date.now()}`),
-      date: responseData.date || formatDateForLocalComment(new Date()),
-      content: responseData.content || value,
-      commenterId: Number(responseData.commenterId || currentUser.id || currentUser.userId || 0),
-      likeCount: Number(responseData.likeCount || 0),
-      commenter: responseData.commenter || {
-        id: String(currentUser.id || currentUser.userId || ''),
-        name: displayName,
-        avatar: currentUser.avatar || 'http://10.86.136.242:9000/images/default_avatar.png',
-        collegeId: String(currentUser.collegeId || ''),
-        collegeName: currentUser.collegeName || '',
-        isVerified: currentUser.verifyStatus === 1,
-      },
-      isLiked: Boolean(responseData.isLiked),
-    } as import('@/api/comments').IForumComment
-
-    commentList.value = [createdComment, ...commentList.value]
-    commentText.value = ''
   }
   catch (error) {
     console.error('发布评论失败', error)
@@ -358,7 +316,12 @@ function goEditPostPage() {
   })
 }
 
+function openPostActionSheet() {
+  postActionVisible.value = true
+}
+
 function openDeleteConfirm() {
+  postActionVisible.value = false
   confirmPopupVisible.value = true
 }
 
@@ -367,6 +330,19 @@ function closeDeleteConfirm() {
     return
 
   confirmPopupVisible.value = false
+}
+
+function handlePostActionSelect(event: { item?: { key?: string } }) {
+  const actionKey = event?.item?.key
+  postActionVisible.value = false
+
+  if (actionKey === 'edit') {
+    goEditPostPage()
+    return
+  }
+
+  if (actionKey === 'delete')
+    openDeleteConfirm()
 }
 
 async function confirmDeletePost() {
@@ -487,7 +463,6 @@ async function toggleCommentLike(comment: import('@/api/comments').IForumComment
             </view>
             <view class="h-40rpx w-96rpx rd-full bg-[#dbe8f1]" />
           </view>
-
           <view class="flex flex-col gap-10rpx">
             <view class="h-30rpx w-92% rd-full bg-[#d8e8f1]" />
             <view class="h-22rpx w-100% rd-full bg-[#e7eff5]" />
@@ -547,15 +522,6 @@ async function toggleCommentLike(comment: import('@/api/comments').IForumComment
         {{ myPostReviewNoticeText }}
       </view>
 
-      <view v-if="isMyPost" class="flex justify-end gap-12rpx">
-        <view class="center flex b-2rpx b-#215476 rd-full b-solid bg-white px-16rpx py-8rpx" @tap.stop="goEditPostPage">
-          <wd-text text="修改" size="22rpx" color="#215476" />
-        </view>
-        <view class="center flex b-2rpx b-#d03050 rd-full b-solid bg-white px-16rpx py-8rpx" @tap.stop="openDeleteConfirm">
-          <wd-text text="删除" size="22rpx" color="#d03050" />
-        </view>
-      </view>
-
       <view class="rd-20rpx bg-white p-20rpx" style="box-shadow: 0 6rpx 14rpx rgba(33,84,118,0.08)">
         <view class="flex flex-col gap-14rpx">
           <view class="flex items-center gap-14rpx">
@@ -564,7 +530,15 @@ async function toggleCommentLike(comment: import('@/api/comments').IForumComment
               <wd-text :text="post.author.name" size="30rpx" color="#1f2937" />
               <wd-text :text="formatAuthorMeta(post.author.collegeName, post.date)" size="21rpx" color="#6b7280" />
             </view>
-            <view class="ml-auto h-max flex rd-full bg-#215476 px-16rpx py-8rpx">
+            <view v-if="isMyPost" class="ml-auto flex items-center gap-12rpx">
+              <view class="h-max flex rd-full bg-#215476 px-16rpx py-8rpx">
+                <wd-text :text="post.categoryName || '-'" size="20rpx" color="white" />
+              </view>
+              <view class="center flex b-2rpx b-#cfe0eb rd-full b-solid bg-[#f8fbfd] px-18rpx py-8rpx" @tap.stop="openPostActionSheet">
+                <wd-text text="编辑" size="22rpx" color="#215476" />
+              </view>
+            </view>
+            <view v-else class="ml-auto h-max flex rd-full bg-#215476 px-16rpx py-8rpx">
               <wd-text :text="post.categoryName || '-'" size="20rpx" color="white" />
             </view>
           </view>
@@ -656,36 +630,89 @@ async function toggleCommentLike(comment: import('@/api/comments').IForumComment
     style="box-shadow: 0 -4rpx 12rpx rgba(33,84,118,0.08)"
     :style="commentBarStyle"
   >
-    <view class="flex items-center gap-16rpx pb-16rpx">
-      <wd-input
-        v-model="commentText"
-        type="text"
-        placeholder="说点什么吧..."
-        class="flex-1"
-        clearable
-        :adjust-position="false"
-        @keyboardheightchange="handleInputKeyboardHeightChange"
-      />
+    <view class="pb-12rpx">
+      <view class="mb-10rpx flex items-center gap-8rpx px-4rpx">
+        <view class="i-material-symbols-info-outline-rounded size-24rpx color-[#64748b]" />
+        <wd-text text="评论提交后需要先经过审核，审核通过后才会展示。" size="20rpx" color="#64748b" />
+      </view>
+      <view class="flex items-center gap-16rpx pb-16rpx">
+        <wd-input
+          v-model="commentText"
+          type="text"
+          placeholder="说点什么吧..."
+          class="flex-1"
+          clearable
+          :adjust-position="false"
+          @keyboardheightchange="handleInputKeyboardHeightChange"
+        />
 
-      <wd-button type="primary" size="small" :loading="publishing" class="!b-[#215476] !rounded-999rpx !bg-[#215476] !px-20rpx !color-white" @click="handlePublishComment">
-        发布
-      </wd-button>
+        <wd-button type="primary" :loading="publishing" class="!h-72rpx !min-w-128rpx !b-[#215476] !rounded-999rpx !bg-[#215476] !px-28rpx !color-white" @click="handlePublishComment">
+          发布
+        </wd-button>
+      </view>
     </view>
   </view>
-
   <wd-backtop :scroll-top="pageScrollTop" :right="16" :bottom="96" custom-class="!size-96rpx !bg-#215476 !color-white" :top="600" />
 
-  <wd-popup v-model="confirmPopupVisible" position="center" custom-style="width: 560rpx; border-radius: 24rpx;">
-    <view class="flex flex-col gap-24rpx p-32rpx">
-      <wd-text text="确认删除这条帖子吗？" size="30rpx" color="black" />
-      <wd-text text="删除后不可恢复" size="24rpx" color="#999999" />
-      <view class="flex justify-center gap-16rpx">
-        <wd-button plain @click="closeDeleteConfirm">
-          <wd-text text="取消" size="24rpx" color="black" />
-        </wd-button>
-        <wd-button type="error" :loading="deleting" @click="confirmDeletePost">
-          <wd-text text="确认删除" size="24rpx" color="white" />
-        </wd-button>
+  <wd-popup
+    v-model="postActionVisible"
+    position="center"
+    root-portal
+    :z-index="300"
+    custom-style="width: 560rpx; border-radius: 28rpx; overflow: hidden; background: transparent;"
+  >
+    <view class="overflow-hidden rd-28rpx bg-[linear-gradient(180deg,#f8fbfd_0%,#eef4f8_100%)] shadow-[0_22rpx_44rpx_rgba(33,84,118,0.18)]">
+      <view class="flex flex-col px-32rpx py-26rpx text-center">
+        <wd-text text="帖子管理" size="30rpx" color="#16364d" bold />
+        <wd-text text="选择你想进行的操作" size="22rpx" color="#64748b" class="mt-8rpx" />
+      </view>
+      <view class="px-20rpx pb-20rpx">
+        <view class="flex flex-col gap-12rpx">
+          <view class="h-88rpx center flex rd-22rpx bg-white shadow-[0_8rpx_18rpx_rgba(33,84,118,0.08)]" @tap="handlePostActionSelect({ item: { key: 'edit' } })">
+            <wd-text text="修改帖子" size="26rpx" color="#215476" />
+          </view>
+          <view class="h-88rpx center flex rd-22rpx bg-[#fff1f2]" @tap="handlePostActionSelect({ item: { key: 'delete' } })">
+            <wd-text text="删除帖子" size="26rpx" color="#d03050" />
+          </view>
+          <!-- <view class="h-80rpx center flex rd-22rpx bg-transparent" @tap="postActionVisible = false">
+            <wd-text text="取消" size="24rpx" color="#64748b" />
+          </view> -->
+        </view>
+      </view>
+    </view>
+  </wd-popup>
+  <wd-popup
+    v-model="confirmPopupVisible"
+    position="center"
+    root-portal
+    :z-index="320"
+    :close-on-click-modal="false"
+    custom-style="width: 620rpx; border-radius: 28rpx; overflow: hidden; background: transparent;"
+  >
+    <view class="overflow-hidden rd-28rpx bg-[linear-gradient(180deg,#fff8f8_0%,#ffffff_30%,#fffafa_100%)] shadow-[0_24rpx_48rpx_rgba(120,25,25,0.18)]">
+      <view class="b-b-1rpx b-[#f3d4d8] b-solid bg-[linear-gradient(135deg,#fff1f2_0%,#ffe4e6_100%)] px-32rpx py-24rpx">
+        <view class="flex items-center gap-14rpx">
+          <view class="h-64rpx w-64rpx flex items-center justify-center rd-full bg-[#d03050]/12">
+            <view class="i-material-symbols-delete-outline-rounded size-34rpx color-[#d03050]" />
+          </view>
+          <view class="min-w-0 flex flex-1 flex-col">
+            <wd-text text="确认删除帖子" size="30rpx" color="#881337" bold />
+            <wd-text text="删除后内容、图片和互动记录都无法恢复。" size="22rpx" color="#9f1239" class="mt-6rpx" />
+          </view>
+        </view>
+      </view>
+      <view class="px-32rpx py-28rpx">
+        <view class="rd-20rpx bg-[#fff5f5] px-20rpx py-18rpx">
+          <wd-text text="如果只是想继续调整内容，建议先使用修改帖子；只有确定不再保留这条内容时再执行删除。" size="22rpx" color="#7f1d1d" class="leading-[1.7]" />
+        </view>
+        <view class="mt-28rpx flex gap-16rpx">
+          <wd-button plain class="!h-80rpx !flex-1 !b-[#d7dee5] !rd-full !bg-white" @click="closeDeleteConfirm">
+            <wd-text text="先不删" size="24rpx" color="#475569" />
+          </wd-button>
+          <wd-button type="error" :loading="deleting" class="shadow-[0_12rpx_24rpx_rgba(208,48,80,0.24)] !h-80rpx !flex-1 !rd-full !b-none !bg-[#d03050]" @click="confirmDeletePost">
+            <wd-text text="确认删除" size="24rpx" color="white" />
+          </wd-button>
+        </view>
       </view>
     </view>
   </wd-popup>
