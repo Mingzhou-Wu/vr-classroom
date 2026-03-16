@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import { useTokenStore, useUserStore } from '@/store'
 import { defaultUserInfo } from '@/store/user'
+import { getEnvBaseUrl } from '@/utils'
 
 definePage({
   style: {
@@ -10,6 +11,7 @@ definePage({
 
 const tokenStore = useTokenStore()
 const userStore = useUserStore()
+const apiBaseUrl = getEnvBaseUrl()
 const showSkeleton = ref(true)
 let skeletonTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -25,10 +27,60 @@ const user = computed(() => {
 })
 
 async function handleLogin() {
-  if (isLogin.value)
+  console.log('[me] 点击去登录按钮')
+  if (isLogin.value) {
+    console.log('[me] 当前已登录，跳过登录流程')
     return
+  }
 
-  await tokenStore.wxPhoneLogin('13800138001')
+  try {
+    const loginRes = await new Promise<{ code?: string }>((resolve, reject) => {
+      wx.login({
+        success: resolve,
+        fail: reject,
+      } as any)
+    })
+
+    const code = loginRes?.code
+    console.log('[me] wx.login 返回 code:', code)
+    if (!code) {
+      uni.showToast({
+        title: '获取登录凭证失败',
+        icon: 'none',
+      })
+      return
+    }
+
+    const loginUrl = `${apiBaseUrl}/api/users/login`
+    console.log('[me] 准备请求登录接口:', loginUrl)
+
+    // const response = await new Promise<any>((resolve, reject) => {
+    //   uni.request({
+    //     url: loginUrl,
+    //     method: 'POST',
+    //     data: {
+    //       loginCode: code,
+    //     },
+    //     success: (res) => {
+    //       console.log('[me] 登录接口原始响应:', res)
+    //       resolve((res.data as any)?.data ?? res.data)
+    //     },
+    //     fail: (err) => {
+    //       console.log('[me] 登录接口请求失败:', err)
+    //       reject(err)
+    //     },
+    //   })
+    // })
+    // console.log('用户登录返回:', response)
+  }
+  catch (error) {
+    console.log('[me] 登录 catch:', error)
+    console.error('登录失败:', error)
+    uni.showToast({
+      title: '登录失败，请重试',
+      icon: 'none',
+    })
+  }
 }
 
 onShow(() => {
@@ -108,7 +160,7 @@ function handleMenuTap(key: string) {
     <view class="h-400rpx" />
 
     <view v-if="showSkeleton" class="flex flex-col gap-24rpx rd-t-32rpx bg-[#f3f6f9] px-24rpx py-24rpx">
-      <view class="rd-20rpx bg-[linear-gradient(165deg,#d4e5ed_0%,#ffffff_38%,#d8e8ef_100%)] px-24rpx py-20rpx" style="box-shadow: 0 6rpx 14rpx rgba(33,84,118,0.1)">
+      <view class="rd-20rpx bg-[#edf4f8] px-24rpx py-20rpx" style="box-shadow: 0 6rpx 14rpx rgba(33,84,118,0.1)">
         <view class="flex items-center gap-24rpx">
           <view class="h-128rpx w-128rpx rd-full bg-[#dbe8f1]" />
 
@@ -146,7 +198,7 @@ function handleMenuTap(key: string) {
     </view>
 
     <view v-else class="flex flex-col gap-24rpx rd-t-32rpx bg-[#f3f6f9] px-24rpx py-24rpx">
-      <view class="rd-20rpx bg-[linear-gradient(165deg,#d4e5ed_0%,#ffffff_38%,#d8e8ef_100%)] px-24rpx py-20rpx" style="box-shadow: 0 6rpx 14rpx rgba(33,84,118,0.1)">
+      <view class="rd-20rpx bg-[#edf4f8] px-24rpx py-20rpx" style="box-shadow: 0 6rpx 14rpx rgba(33,84,118,0.1)">
         <view class="flex items-center gap-24rpx">
           <wd-img :src="user.avatar" class="h-128rpx w-128rpx b-4rpx b-white rd-full b-solid" mode="aspectFill" />
 
@@ -161,7 +213,7 @@ function handleMenuTap(key: string) {
                 size="small"
                 plain
                 type="info"
-                @click="handleLogin"
+                @tap="handleLogin"
               >
                 <wd-text text="去登录" size="22rpx" color="#215476" />
               </wd-button>
@@ -201,3 +253,6 @@ function handleMenuTap(key: string) {
     </view>
   </view>
 </template>
+
+
+
