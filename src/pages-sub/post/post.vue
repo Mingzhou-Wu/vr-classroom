@@ -50,7 +50,7 @@ const myPostReviewNoticeText = computed(() => {
 
   const status = Number(post.value?.status)
   if (status === 0)
-    return '正在等待管理员审核'
+    return '帖子正在等待审核，审核通过后会展示在社区中'
   if (status === 2)
     return `驳回原因：${post.value?.rejectReason || '未提供'}`
   return ''

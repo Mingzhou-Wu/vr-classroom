@@ -19,6 +19,7 @@ const likingPostIds = ref<Set<string>>(new Set())
 const pageScrollTop = ref(0)
 const PAGE_SCROLL_SYNC_INTERVAL_MS = 100
 const lastPageScrollSyncAt = ref(0)
+const skeletonPostList = Array.from({ length: 3 }, (_, index) => index)
 
 onPageScroll((e) => {
   const now = Date.now()
@@ -28,6 +29,9 @@ onPageScroll((e) => {
   pageScrollTop.value = e.scrollTop
   lastPageScrollSyncAt.value = now
 })
+
+const totalLikeCount = computed(() => postList.value.reduce((sum, post) => sum + Number(post.likeCount || 0), 0))
+const totalCommentCount = computed(() => postList.value.reduce((sum, post) => sum + Number(post.commentCount || 0), 0))
 
 function normalizeRecord(record: IUserPostRecord): ILikedPostCard {
   const author = (record as Record<string, any>).author as Record<string, any> | undefined
@@ -75,19 +79,34 @@ function formatPublishTime(dateText?: string) {
   if (Number.isNaN(publishedAt.getTime()))
     return ''
 
-  const utc8Date = new Date(publishedAt.getTime() + 8 * 60 * 60 * 1000)
-  const year = utc8Date.getUTCFullYear()
-  const month = String(utc8Date.getUTCMonth() + 1).padStart(2, '0')
-  const day = String(utc8Date.getUTCDate()).padStart(2, '0')
-  const hour = String(utc8Date.getUTCHours()).padStart(2, '0')
-  const minute = String(utc8Date.getUTCMinutes()).padStart(2, '0')
-  const second = String(utc8Date.getUTCSeconds()).padStart(2, '0')
-  return `${year}-${month}-${day} ${hour}:${minute}:${second}`
+  const diffMs = Date.now() - publishedAt.getTime()
+  if (diffMs < 0)
+    return '刚刚'
+
+  if (diffMs < 60 * 1000)
+    return '刚刚'
+
+  const diffMinutes = Math.floor(diffMs / (60 * 1000))
+  if (diffMinutes < 60)
+    return `${diffMinutes}分钟前`
+
+  const diffHours = Math.floor(diffMs / (60 * 60 * 1000))
+  if (diffHours < 24)
+    return `${diffHours}小时前`
+
+  const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000))
+  const month = String(publishedAt.getMonth() + 1).padStart(2, '0')
+  const day = String(publishedAt.getDate()).padStart(2, '0')
+  if (diffDays > 365)
+    return `${publishedAt.getFullYear()}-${month}-${day}`
+
+  return `${month}-${day}`
 }
 
-function formatPublishMeta(dateText?: string) {
-  const publishText = formatPublishTime(dateText)
-  return publishText ? `发布于 ${publishText}` : ''
+function formatAuthorMeta(post: ILikedPostCard) {
+  const collegeText = post.author?.collegeName || '校友动态'
+  const publishText = formatPublishTime(post.date)
+  return publishText ? `${collegeText} · 发布于${publishText}` : collegeText
 }
 
 function getPostImages(post: ILikedPostCard) {
@@ -174,6 +193,20 @@ function goPostPage(postId: string) {
   })
 }
 
+function handleRefresh() {
+  if (loading.value || loadingMore.value)
+    return
+
+  uni.pageScrollTo({
+    scrollTop: 0,
+    duration: 0,
+  })
+  currentPage.value = 1
+  totalPage.value = 1
+  postList.value = []
+  fetchPostList()
+}
+
 async function togglePostLike(post: ILikedPostCard) {
   const targetPostId = String(post.id || '')
   if (!targetPostId || likingPostIds.value.has(targetPostId))
@@ -210,68 +243,113 @@ async function togglePostLike(post: ILikedPostCard) {
 </script>
 
 <template>
-  <view class="pb-20rpx pt-16rpx">
-    <view v-if="loading" class="center flex flex-col gap-8rpx py-40rpx text-gray-500">
-      <wd-loading />
-      <wd-text text="加载中..." color="black" size="24rpx" />
-    </view>
-
-    <wd-card v-for="post in loading ? [] : postList" :key="post.id" :data="post" type="rectangle" @tap="goPostPage(post.id)">
-      <view class="flex flex-col gap-16rpx">
-        <view class="flex items-center justify-between gap-12rpx">
-          <wd-text :text="formatPublishMeta(post.date)" size="22rpx" color="#999999" />
-
-          <view class="h-max flex rd-xl bg-#215476 px-12rpx py-8rpx">
-            <wd-text :text="post.categoryName || '未分类'" size="20rpx" color="white" />
+  <view class="min-h-screen overflow-x-hidden bg-[#f3f6f9] pb-20rpx">
+    <view v-if="loading" class="px-16rpx pt-16rpx">
+      <view
+        v-for="item in skeletonPostList"
+        :key="`liked-post-skeleton-${item}`"
+        class="mb-16rpx rd-20rpx bg-white p-20rpx"
+        style="box-shadow: 0 6rpx 14rpx rgba(33,84,118,0.08)"
+      >
+        <view class="flex flex-col gap-14rpx">
+          <view class="flex items-center justify-between gap-12rpx">
+            <view class="h-22rpx w-180rpx rd-full bg-[#dbe8f1]" />
+            <view class="h-40rpx w-112rpx rd-full bg-[#e5eef5]" />
           </view>
-        </view>
-
-        <view class="flex flex-col gap-8rpx">
-          <wd-text :text="post.title" size="30rpx" color="black" bold />
-          <wd-text :text="post.summary" size="24rpx" color="black" :lines="2" />
-        </view>
-
-        <view v-if="getPostImages(post).length === 1" class="h-360rpx overflow-hidden rd-12rpx bg-#f7f8fa" @tap.stop="handlePreviewPostImages(post, getPostImages(post)[0])">
-          <image :src="getPostImages(post)[0]" mode="aspectFill" class="h-full w-full" />
-        </view>
-
-        <view v-else-if="getPostImages(post).length > 1" class="grid grid-cols-3 gap-8rpx" @tap.stop>
-          <view
-            v-for="(imageUrl, index) in getPostImages(post)"
-            :key="`${post.id}-${index}`"
-            class="aspect-square overflow-hidden rd-10rpx bg-#f7f8fa"
-            @tap.stop="handlePreviewPostImages(post, imageUrl)"
-          >
-            <image :src="imageUrl" mode="aspectFill" class="h-full w-full" />
+          <view class="h-28rpx w-88% rd-full bg-[#d8e8f1]" />
+          <view class="h-22rpx w-100% rd-full bg-[#e7eff5]" />
+          <view class="h-22rpx w-68% rd-full bg-[#eef4f8]" />
+          <view class="grid grid-cols-3 gap-8rpx">
+            <view v-for="cell in 3" :key="`liked-post-skeleton-image-${item}-${cell}`" class="aspect-square rd-12rpx bg-[#e5eef5]" />
           </view>
-        </view>
-
-        <view class="flex items-center justify-between gap-36rpx">
-          <view class="flex flex-1 justify-between">
-            <view class="center flex gap-8rpx">
-              <view class="i-majesticons-share-line size-42rpx bg-black" />
-              <wd-text :text="post.shareCount" size="24rpx" color="black" />
-            </view>
-
-            <view class="center flex gap-8rpx">
-              <view class="i-majesticons-comment-2-text-line size-42rpx bg-black" />
-              <wd-text :text="post.commentCount" size="24rpx" color="black" />
-            </view>
-
-            <view class="center flex gap-8rpx" @tap.stop="togglePostLike(post)">
-              <view v-if="post.isLiked" class="i-majesticons:thumb-up size-42rpx bg-#ff3040" />
-              <view v-else class="i-majesticons-thumb-up-line size-42rpx bg-black" />
-              <wd-text :text="post.likeCount" size="24rpx" color="black" />
+          <view class="mt-6rpx flex items-center justify-between">
+            <view class="flex gap-18rpx">
+              <view v-for="metric in 3" :key="`liked-post-skeleton-metric-${item}-${metric}`" class="flex items-center gap-10rpx">
+                <view class="h-36rpx w-36rpx rd-full bg-[#dbe8f1]" />
+                <view class="h-22rpx w-32rpx rd-full bg-[#e7eff5]" />
+              </view>
             </view>
           </view>
         </view>
       </view>
-    </wd-card>
+    </view>
 
-    <view v-if="!loading" class="text-center">
+    <view v-else-if="!postList.length" class="px-16rpx pt-16rpx">
+      <view class="rd-24rpx bg-white px-24rpx py-64rpx text-center" style="box-shadow: 0 8rpx 18rpx rgba(33,84,118,0.08)">
+        <view class="mx-auto mb-18rpx h-120rpx w-120rpx center rd-full bg-[#edf4f8]">
+          <view class="i-material-symbols-thumb-up-rounded h-60rpx w-60rpx color-[#7a95ab]" />
+        </view>
+        <wd-text text="还没有点赞过帖子" size="30rpx" color="#1f2937" bold />
+        <wd-text text="去社区逛一逛，把喜欢的内容点亮，这里就会慢慢积累成你的精选列表。" size="24rpx" color="#64748b" :lines="2" />
+      </view>
+    </view>
+
+    <view v-else class="px-16rpx pt-16rpx">
+      <view
+        v-for="post in postList"
+        :key="post.id"
+        class="mb-16rpx rd-20rpx bg-white p-20rpx"
+        style="box-shadow: 0 6rpx 14rpx rgba(33,84,118,0.08)"
+        @tap="goPostPage(post.id)"
+      >
+        <view class="flex flex-col gap-14rpx">
+          <view class="flex items-center justify-between gap-12rpx">
+            <wd-text :text="formatPublishTime(post.date) ? `发布于 ${formatPublishTime(post.date)}` : ''" size="22rpx" color="#6b7280" />
+
+            <view class="ml-auto flex items-center gap-8rpx">
+              <view class="center flex rd-full bg-[#215476] px-16rpx py-8rpx">
+                <wd-text :text="post.categoryName || '未分类'" size="20rpx" color="#ffffff" />
+              </view>
+            </view>
+          </view>
+
+          <view class="flex flex-col gap-8rpx">
+            <wd-text :text="post.title" size="30rpx" color="#0f172a" bold />
+            <wd-text :text="post.summary" size="24rpx" color="#334155" :lines="2" />
+          </view>
+
+          <view v-if="getPostImages(post).length === 1" class="flex items-start justify-start">
+            <view class="h-420rpx overflow-hidden rd-14rpx bg-white" @tap.stop="handlePreviewPostImages(post, getPostImages(post)[0])">
+              <image :src="getPostImages(post)[0]" mode="heightFix" class="block h-full max-w-full w-auto" />
+            </view>
+          </view>
+
+          <view v-else-if="getPostImages(post).length > 1" class="grid grid-cols-3 gap-8rpx" @tap.stop>
+            <view
+              v-for="(imageUrl, index) in getPostImages(post)"
+              :key="`${post.id}-${index}`"
+              class="aspect-square overflow-hidden rd-12rpx bg-[#f7f8fa]"
+              @tap.stop="handlePreviewPostImages(post, imageUrl)"
+            >
+              <image :src="imageUrl" mode="aspectFill" class="h-full w-full" />
+            </view>
+          </view>
+
+          <view class="mt-4rpx flex items-center justify-between px-10rpx">
+            <view class="center flex gap-10rpx">
+              <view class="i-majesticons-share-line size-40rpx bg-[#64748b]" />
+              <wd-text :text="post.shareCount" size="24rpx" color="#475569" />
+            </view>
+
+            <view class="center flex gap-10rpx">
+              <view class="i-majesticons-comment-2-text-line size-40rpx bg-[#64748b]" />
+              <wd-text :text="post.commentCount" size="24rpx" color="#475569" />
+            </view>
+
+            <view class="center flex gap-10rpx" @tap.stop="togglePostLike(post)">
+              <view v-if="post.isLiked" class="i-majesticons:thumb-up size-40rpx bg-[#ff3040]" />
+              <view v-else class="i-majesticons-thumb-up-line size-40rpx bg-[#64748b]" />
+              <wd-text :text="post.likeCount" size="24rpx" :color="post.isLiked ? '#ff3040' : '#475569'" />
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view v-if="!loading && postList.length" class="pb-10rpx text-center">
       <wd-loadmore :state="loadMoreState" finished-text="没有更多帖子了" />
     </view>
 
-    <wd-backtop :scroll-top="pageScrollTop" :right="16" :bottom="96" custom-class="!size-96rpx !bg-#215476 !color-white" :top="600" />
+    <wd-backtop :scroll-top="pageScrollTop" :right="16" :bottom="96" custom-class="!size-96rpx !bg-#215476 !color-white" custom-style="box-shadow: 0 4rpx 12rpx rgba(33,84,118,0.16)" :top="600" />
   </view>
 </template>
