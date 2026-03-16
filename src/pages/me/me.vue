@@ -35,8 +35,9 @@ const profileActionText = computed(() => {
     return '去登录'
   if (needsVerify.value)
     return '去认证'
-  return '个人资料'
+  return '已认证'
 })
+const profileActionDisabled = computed(() => isLogin.value && !needsVerify.value)
 
 function applyToken(token: string) {
   tokenStore.setTokenInfo({
@@ -157,7 +158,7 @@ onUnload(() => {
   }
 })
 
-const skeletonMenuList = Array.from({ length: 5 }, (_, index) => index)
+const skeletonMenuList = Array.from({ length: 6 }, (_, index) => index)
 
 function goUserPostPage() {
   uni.navigateTo({
@@ -188,7 +189,14 @@ function goUserOrderPage() {
   })
 }
 
+function goProfilePage() {
+  uni.navigateTo({
+    url: '/pages-sub/profile/profile',
+  })
+}
+
 const menuList = [
+  { key: 'profile', text: '个人资料', icon: 'i-material-symbols-person-rounded' },
   { key: 'order', text: '我的捐赠', icon: 'i-material-symbols-receipt-long-rounded' },
   { key: 'post', text: '我的帖子', icon: 'i-material-symbols-article-rounded' },
   { key: 'comment', text: '我的评论', icon: 'i-material-symbols-comment-rounded' },
@@ -207,6 +215,8 @@ function handleMenuTap(key: string) {
     return
   }
 
+  if (key === 'profile')
+    return goProfilePage()
   if (key === 'order')
     return goUserOrderPage()
   if (key === 'post')
@@ -274,7 +284,7 @@ function handleMenuTap(key: string) {
               <wd-text :text="user.collegeName || '未设置学院'" size="20rpx" color="rgba(255,255,255,0.76)" />
             </view>
 
-            <wd-button class="!h-64rpx !rd-full !px-24rpx" custom-style="background: #ffffff; border-color: rgba(255,255,255,0.36); color: #215476; box-shadow: 0 8rpx 18rpx rgba(8,37,58,0.18);" size="small" :loading="loginLoading" @tap="handleProfileAction">
+            <wd-button class="!h-64rpx !rd-full !px-24rpx" custom-style="background: #ffffff; border-color: rgba(255,255,255,0.36); color: #215476; box-shadow: 0 8rpx 18rpx rgba(8,37,58,0.18);" size="small" :loading="loginLoading" :disabled="profileActionDisabled" @tap="handleProfileAction">
               <wd-text :text="profileActionText" size="24rpx" color="#215476" />
             </wd-button>
           </view>
@@ -284,7 +294,7 @@ function handleMenuTap(key: string) {
       <view class="rd-20rpx bg-white px-24rpx py-10rpx shadow-[0_6rpx_14rpx_rgba(33,84,118,0.1)]">
         <view class="h-72rpx flex items-center justify-between">
           <wd-text text="我的服务" size="30rpx" color="#215476" />
-          <wd-text text="共5项" size="20rpx" color="#6b7280" />
+          <wd-text :text="`共${menuList.length}项`" size="20rpx" color="#6b7280" />
         </view>
 
         <view
